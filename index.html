@@ -846,6 +846,14 @@ async function readAll(make) {
     if (data.length < PAGE) return { data: rows };
   }
 }
+// All appointments of one patient, also those outside the loaded window. Adds missing rows to DB so Tx can change them.
+async function apptsOfPatient(pid) {
+  if (LIVE) {
+    const r = await readAll(() => sb.from('appointments').select('*').eq('patient_id', pid));
+    if (!r.error) r.data.forEach(a => { if (!DB.appts.some(x => x.id === a.id)) DB.appts.push(a); });
+  }
+  return DB.appts.filter(a => a.patient_id === pid);
+}
 async function loadLive() {
   const from = addDays(today(), -400), to = addDays(today(), 400);
   const q = [sb.from('doctors').select('*').order('name'), readAll(() => sb.from('patients').select('*')),
@@ -1518,15 +1526,43 @@ function patientSheet(pid) {
     <div><div class="label" style="margin-bottom:6px">Upcoming</div>${upcoming.length ? upcoming.map(a => `<button class="visit vbtn" data-act="open" data-id="${a.id}"><b>${fmtDate(a.date)} · ${hm(a.start_min)} · Chair ${a.chair}</b><span class="muted">${esc(doctor(a.doctor_id).name)}${a.reason ? ' · ' + esc(a.reason) : ''}</span></button>`).join('') : '<p class="hint" style="margin:0">No upcoming appointments.</p>'}</div>
     <div><div class="label" style="margin-bottom:6px">Visit history</div>${visits.length ? visits.slice(0, 30).map(v => `<button class="visit vbtn" data-act="open" data-id="${v.id}"><b>${fmtDate(v.date, { day: 'numeric', month: 'short', year: 'numeric' })} · ${esc(v.treatment_done || v.reason || 'Visit')}</b>
       <span class="muted">${esc(doctor(v.note_doctor_id || v.doctor_id).name)}${v.plan ? ' · ' + esc(v.plan) : ''}${v.next_followup ? ' · follow-up ' + fmtDate(v.next_followup) : ''}</span></button>`).join('') : '<p class="hint" style="margin:0">No visits yet.</p>'}</div>`, panel => {
-    $('#ptEdit', panel).addEventListener('click', () => {
+    $('#ptEdit', panel).addEventListener('click', async () => {
+      const owned = await apptsOfPatient(pid); // every row, cancelled and older ones too: all must move before a delete
       $('#ptForm', panel).innerHTML = `<form id="pe" class="card soft" style="display:grid;gap:10px"><div class="two"><label class="field"><span class="label">Name</span><input id="peName" value="${esc(p.name)}"></label>
-        <label class="field"><span class="label">Phone</span><input id="pePhone" type="tel" value="${esc(p.phone)}"></label></div><button class="btn primary">Save details</button></form>`;
+        <label class="field"><span class="label">Phone</span><input id="pePhone" type="tel" value="${esc(p.phone)}"></label></div><div id="peMsg"></div><button class="btn primary">Save details</button></form>
+        <div class="card soft" style="display:grid;gap:10px;margin-top:10px">${owned.length
+          ? `<p class="hint" style="margin:0">Same person added twice? Move this record's ${owned.length} visit${owned.length > 1 ? 's' : ''} to the other record. Then this record is deleted.</p>
+             <label class="field"><span class="label">Merge into</span><input id="pmQ" placeholder="Name or phone of the other record" autocomplete="off"></label><div id="pmList" class="quick"></div>`
+          : `<p class="hint" style="margin:0">This patient has no visits. You can delete the record. You can undo this from More > History.</p>
+             <button class="btn danger" id="pDel">Delete patient</button>`}</div>`;
       $('#pe', panel).addEventListener('submit', e => {
         e.preventDefault();
         const name = $('#peName', panel).value.trim(), phone = $('#pePhone', panel).value.trim();
-        if (!name || digits(phone).length < 10) return;
+        const bad = !name ? 'Enter the patient name.' : digits(phone).length < 10 ? 'The phone number needs at least 10 digits.' : '';
+        if (bad) { $('#peMsg', panel).innerHTML = `<div class="err">${bad}</div>`; return; }
         const tx = Tx(); tx.update('patients', pid, { name, phone }); commit('Edited ' + name, tx).then(() => patientSheet(pid));
       });
+      const del = $('#pDel', panel);
+      if (del) del.addEventListener('click', () => {
+        if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Tap again to delete'; return; }
+        const tx = Tx(); tx.remove('patients', pid); closeSheet(); commit('Deleted patient ' + p.name, tx);
+      });
+      const q = $('#pmQ', panel), list = $('#pmList', panel);
+      if (q) {
+        q.addEventListener('input', () => {
+          const t = q.value.trim().toLowerCase(), dg = digits(t);
+          const m = t.length < 2 ? [] : DB.patients.filter(x => x.id !== pid && (dg.length >= 4 ? digits(x.phone).includes(dg) : x.name.toLowerCase().includes(t))).slice(0, 6);
+          list.innerHTML = m.map(x => `<button type="button" data-id="${x.id}">${esc(x.name)} · ${esc(x.phone)}</button>`).join('') || (t.length >= 2 ? '<span class="hint">No other patient matches.</span>' : '');
+        });
+        list.addEventListener('click', e => {
+          const b = e.target.closest('button'); if (!b) return;
+          const to = patient(b.dataset.id);
+          if (b.dataset.sure !== '1') { list.querySelectorAll('button').forEach(x => { delete x.dataset.sure; x.textContent = `${patient(x.dataset.id).name} · ${patient(x.dataset.id).phone}`; });
+            b.dataset.sure = '1'; b.textContent = `Tap again: merge into ${to.name}`; return; }
+          const tx = Tx(); owned.forEach(a => tx.update('appointments', a.id, { patient_id: to.id })); tx.remove('patients', pid);
+          commit(`Merged ${p.name} into ${to.name}`, tx).then(() => patientSheet(to.id));
+        });
+      }
     });
   });
 }
