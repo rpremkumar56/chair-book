@@ -835,10 +835,21 @@ async function afterLogin() {
     .subscribe(st => { UI.online = st === 'SUBSCRIBED'; renderHeaderOnly(); });
   flush();
 }
+// Supabase sends at most 1000 rows per request. Read page by page (sorted by id) until a page is short.
+const PAGE = 1000;
+async function readAll(make) {
+  const rows = [];
+  for (let at = 0; ; at += PAGE) {
+    const { data, error } = await make().order('id').range(at, at + PAGE - 1);
+    if (error) return { error };
+    rows.push(...data);
+    if (data.length < PAGE) return { data: rows };
+  }
+}
 async function loadLive() {
   const from = addDays(today(), -400), to = addDays(today(), 400);
-  const q = [sb.from('doctors').select('*').order('name'), sb.from('patients').select('*'),
-    sb.from('appointments').select('*').gte('date', from).lte('date', to), sb.from('blocks').select('*').gte('date', addDays(today(), -30)),
+  const q = [sb.from('doctors').select('*').order('name'), readAll(() => sb.from('patients').select('*')),
+    readAll(() => sb.from('appointments').select('*').gte('date', from).lte('date', to)), readAll(() => sb.from('blocks').select('*').gte('date', addDays(today(), -30))),
     sb.from('change_log').select('*').order('at', { ascending: false }).limit(150)];
   if (isAdmin()) q.push(sb.from('staff').select('*').order('name'), sb.from('staff_requests').select('*'));
   const r = await Promise.all(q);
