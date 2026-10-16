@@ -289,6 +289,45 @@ main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); displa
 .mday.today { box-shadow: inset 0 0 0 2px var(--accent); }
 .mday.sel { background: var(--ink); color: var(--bg); }
 
+/* v4: notices, closed days, clinic days, print */
+.banner.upd { background: var(--sky); color: var(--ink); grid-template-columns: minmax(0, 1fr) auto; align-items: center; font-weight: 700; padding: 8px 8px 8px 14px; }
+.banner.closed { background: var(--sunk); color: var(--ink); }
+.card.failed { background: var(--bad-soft); color: var(--bad); }
+.card.failed .hrow { border-top-color: color-mix(in srgb, var(--bad) 25%, transparent); }
+.card.failed .lbl { color: var(--ink); }
+.card.failed .hint { color: var(--bad); }
+.wd.closed small { text-decoration: line-through; }
+.wd.closed b { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); }
+.wd.closed.today b { box-shadow: inset 0 0 0 2px var(--accent); }
+.wd.closed.sel b { background: var(--muted); color: var(--bg); box-shadow: none; }
+.mday.closed { background: repeating-linear-gradient(135deg, var(--sunk) 0 5px, transparent 5px 10px); color: var(--muted); }
+.mday.closed.sel { background: var(--muted); color: var(--bg); }
+.legend i.cl { background: repeating-linear-gradient(135deg, var(--muted) 0 2px, var(--sunk) 2px 5px); }
+.wkdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.wkdays button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 0; font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.wkdays button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); text-decoration: line-through; }
+.field.grow { flex: 1; }
+.qtop { display: flex; align-items: flex-start; gap: 10px; }
+.qtop > div { flex: 1; min-width: 0; }
+.print-only { display: none; }
+
+@media print {
+  @page { margin: 12mm; }
+  :root { --bg: #fff; --surface: #fff; --ink: #000; --muted: #444; --line: #999; }
+  body { background: #fff !important; color: #000 !important; font-size: 11pt; }
+  .top, .tabs, .fab, .sheet, .toast, .tip, button, .banner, .card.failed { display: none !important; }
+  main:has(.print-only) { display: block; padding: 0; }
+  main:has(.print-only) > *:not(.print-only) { display: none !important; }
+  .print-only { display: block !important; }
+  .print-only h1 { font-size: 16pt; margin: 0 0 2pt; }
+  .print-only h2 { font-size: 13pt; margin: 14pt 0 4pt; }
+  .print-only p { margin: 0 0 6pt; color: #444; }
+  .print-only table { width: 100%; border-collapse: collapse; }
+  .print-only th, .print-only td { border: 1px solid #999; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  .print-only th { background: #eee; font-size: 9.5pt; text-transform: uppercase; letter-spacing: .04em; }
+  .print-only tr { break-inside: avoid; }
+}
+
 </style>
 
 </head><body>
@@ -298,6 +337,8 @@ main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); displa
 <div id="tip" class="tip" hidden></div>
 
 <script>
+/* Build id. build.py writes it here and in version.json. '2026.10.16-0656-5534f9b' (not built) = dev. */
+const APP_VERSION = '2026.10.16-0656-5534f9b';
 /* ===== Settings you edit before going live =====
    Paste your Supabase project URL and anon key here. Leave empty to run the demo. */
 const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0bHhhbXN1cGxybnN6ZGhpaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwOTc4NTAsImV4cCI6MjEwNzY3Mzg1MH0.W8kb9cw8xqWIrLCM2ZH7yVJvzDi_si0DE_DFhpWn7Zg" };
@@ -566,17 +607,26 @@ const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supaba
 /* ===== Core: state, helpers, transactions, sync, demo data ===== */
 const S = window.Sched;
 const LIVE = !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+// Build id from shell.html. Not built ('@@…@@') or 'dev' = no update checks.
+const VERSION = typeof APP_VERSION === 'string' ? APP_VERSION : 'dev';
+const DEV_BUILD = !VERSION || VERSION === 'dev' || VERSION.indexOf('@@') === 0;
 const STORE_KEY = 'chairbook-demo-v2';
 const OUTBOX_KEY = 'chairbook-outbox';
+const FAILED_KEY = 'bookassist-failed';   // saves the server refused, kept until dismissed
+const SNAP_KEY = 'bookassist-snap-';      // + user id: last data this phone loaded, for an offline start
+const WINDOW_BACK = 92, WINDOW_AHEAD = 180; // days of appointments loaded (Insights needs 90 back)
+const LOG_LIMIT = 50;
 const ROW = 60; // pixels per 30-minute slot
 const STATUS = { booked: 'Booked', arrived: 'Waiting', in_treatment: 'In chair', done: 'Done', no_show: 'No-show', cancelled: 'Cancelled' };
 const TREATMENTS = ['Consultation', 'Scaling', 'Filling', 'RCT', 'Extraction', 'Crown prep', 'Crown fit', 'Ortho review', 'Implant', 'X-ray'];
 const TABLE = { appointments: 'appts', patients: 'patients', doctors: 'doctors', blocks: 'blocks' };
 const ROLE_NAME = { admin: 'Admin', receptionist: 'Receptionist', assistant: 'Assistant' };
+const defaultConfig = () => ({ closed_dates: [], closed_weekdays: [0] });
 
-const DB = { doctors: [], patients: [], appts: [], blocks: [], log: [], staff: [], requests: [] };
+const DB = { doctors: [], patients: [], appts: [], blocks: [], log: [], staff: [], requests: [], config: defaultConfig(), errorCount: 0 };
 const UI = { tab: 'day', date: null, chairs: 0, role: 'receptionist', user: 'Receptionist', userId: null, online: true, pending: 0,
-  autoScroll: true, pq: '', ins: { range: 30, doc: '', chair: 0, treat: '' }, histAll: false };
+  autoScroll: true, pq: '', ins: { range: 30, doc: '', chair: 0, treat: '' }, histAll: false,
+  failed: Array.isArray(store(FAILED_KEY)) ? store(FAILED_KEY) : [], updateReady: false };
 let demoClock = { min: 11 * 60 + 20, realAt: Date.now(), real: false };
 let sb = null;
 
@@ -613,6 +663,17 @@ const patient = id => DB.patients.find(p => p.id === id) || { name: 'Unknown pat
 const appt = id => DB.appts.find(a => a.id === id);
 const isAdmin = () => UI.role === 'admin';
 const activeDoctors = () => DB.doctors.filter(d => d.active !== false);
+const appShown = () => !!$('.top');
+/** Clinic settings with safe defaults. Keeps extra columns, drops the row id. */
+function normConfig(c) {
+  const d = defaultConfig();
+  if (!c || typeof c !== 'object') return d;
+  const out = Object.assign({}, c, d);
+  delete out.id;
+  if (Array.isArray(c.closed_dates)) out.closed_dates = c.closed_dates.filter(Boolean).map(String);
+  if (Array.isArray(c.closed_weekdays)) out.closed_weekdays = c.closed_weekdays.map(Number).filter(n => n >= 0 && n <= 6);
+  return out;
+}
 
 function newAppt(row) {
   return Object.assign({ id: uid(), chair: 1, duration_min: 30, status: 'booked', kind: 'appointment', reason: '', late: false, arrived_min: null, started_min: null, ended_min: null,
@@ -625,6 +686,11 @@ function moveFields(a, after) {
   if (!changed) return after;
   return Object.assign({}, after, { moved_from_date: a.moved_from_date ?? a.date, moved_from_min: a.moved_from_min ?? a.start_min, informed: false });
 }
+/** Minute columns are integers in the database. */
+function roundMins(row) {
+  if (row) for (const k in row) if ((/_min$/.test(k) || k === 'informed_delay') && typeof row[k] === 'number') row[k] = Math.round(row[k]);
+  return row;
+}
 
 /* ---------- transactions, commit and undo ---------- */
 function Tx() {
@@ -634,64 +700,152 @@ function Tx() {
     update(table, id, patch) {
       const k = table + ':' + id, c = cur(table, id);
       const before = map.has(k) ? map.get(k).before : clone(c);
-      map.set(k, { table, id, before, after: Object.assign(clone(c), patch) });
+      map.set(k, { table, id, before, after: roundMins(Object.assign(clone(c), patch)) });
     },
-    insert(table, row) { map.set(table + ':' + row.id, { table, id: row.id, before: null, after: row }); },
+    insert(table, row) { map.set(table + ':' + row.id, { table, id: row.id, before: null, after: roundMins(row) }); },
     remove(table, id) { const k = table + ':' + id; const before = map.has(k) ? map.get(k).before : clone(cur(table, id)); map.set(k, { table, id, before, after: null }); },
     changes() { return [...map.values()]; }
   };
 }
 function applyLocal(changes) {
   changes.forEach(c => {
-    const arr = DB[TABLE[c.table]], i = arr.findIndex(r => r.id === c.id);
+    const arr = DB[TABLE[c.table]]; if (!arr) return;
+    const i = arr.findIndex(r => r.id === c.id);
     if (c.after === null) { if (i >= 0) arr.splice(i, 1); }
     else if (i >= 0) arr[i] = clone(c.after); else arr.push(clone(c.after));
   });
 }
+const revertLocal = changes => applyLocal(changes.map(c => ({ table: c.table, id: c.id, after: c.before ?? null })).reverse());
 
-/* Live saving goes through an outbox, so a change made offline is kept and sent later. */
-let outbox = (store(OUTBOX_KEY) || []);
-let flushing = false;
-async function persist(changes, logRow, undoId) {
-  if (!LIVE) { saveDemo(); return true; }
-  outbox.push({ changes: changes.map(c => ({ table: c.table, id: c.id, after: c.after })), log: logRow || null, undo: undoId || null });
-  store(OUTBOX_KEY, outbox);
-  return flush();
+/* ---------- saving: outbox, flush, refusals ----------
+   Live saving goes through an outbox, so a change made offline is kept and sent later.
+   Each item: { id, label, at, changes: [{table, id, before, after}], log, undo, tries }.
+   `before` = the row as this phone saw it. The server refuses (BA409) when the row changed elsewhere.
+   Result of one item: 'saved' | 'queued' (kept, sent later) | 'refused' (dropped, listed in UI.failed). */
+let outbox = (Array.isArray(store(OUTBOX_KEY)) ? store(OUTBOX_KEY) : []).map(it => it.id ? it : Object.assign({ id: uid(), label: (it.log && it.log.label) || 'A change', tries: 0 }, it));
+let liveReady = false;          // signed in, staff checked: the outbox may be sent
+let flushRun = null, retryTimer = null, backoff = 0;
+const MAX_TRIES = 10;           // server answered with an unknown error this many times: give up on the item
+const awaited = new Map();      // item id -> result, for items whose caller waits for the answer
+let recentSaves = [];           // { t, changes } saved lately; re-applied over a reload that started before them
+const saveOutbox = () => { store(OUTBOX_KEY, outbox); UI.pending = outbox.length; };
+const saveFailed = () => store(FAILED_KEY, UI.failed);
+
+const REASON = {
+  conflict: 'Someone changed it on another phone. Check it and try again.',
+  overlap: 'Another phone booked this chair at that time. Pick another time.',
+  denied: 'Your account cannot make this change. Ask the admin.',
+  invalid: 'The database did not accept it.',
+  tries: 'The server did not accept it.'
+};
+/** Sort an error from the server. Only conflict/overlap/denied/invalid drop the item; the rest are tried again. */
+function classify(error, status) {
+  const code = String(error && error.code || ''), msg = String(error && error.message || '');
+  if (code === 'BA409' || /^CONFLICT/.test(msg)) return 'conflict';
+  if (code === '23P01') return 'overlap';
+  if (status === 401 || code === 'PGRST301' || code === 'PGRST303' || /jwt/i.test(msg)) return 'auth';
+  if (code === '42501') return 'denied';
+  if (/^2[23]/.test(code) || code === 'P0001' || code === 'P0002') return 'invalid';
+  return 'retry';
 }
-async function flush() {
-  if (flushing || !sb) return true;
-  flushing = true;
-  let ok = true;
+function isNetworkError(error, status) {
+  return !status || status >= 500 || !error.code || /fetch|network|timeout|load failed|offline/i.test(error.message || '');
+}
+function reasonText(kind, error) {
+  const base = REASON[kind] || REASON.invalid;
+  const detail = (kind === 'invalid' || kind === 'tries') && error && error.message ? ' ' + String(error.message).slice(0, 160) : '';
+  return base + detail;
+}
+
+async function persist(changes, logRow, undoId, label) { return (await persistItem(changes, logRow, undoId, label)).status; }
+async function persistItem(changes, logRow, undoId, label) {
+  if (!LIVE) { saveDemo(); return { status: 'saved' }; }
+  const item = { id: uid(), label: label || (logRow && logRow.label) || 'A change', at: new Date().toISOString(),
+    changes: changes.map(c => ({ table: c.table, id: c.id, before: c.before === undefined ? null : c.before, after: c.after })),
+    log: logRow || null, undo: undoId || null, tries: 0 };
+  outbox.push(item); saveOutbox(); renderHeaderOnly();
+  awaited.set(item.id, null);
+  try {
+    // A flush already running picks the item up; run again if it finished just before the item came.
+    for (let i = 0; i < 3 && !awaited.get(item.id) && outbox.includes(item); i++) {
+      if (await flush() === 'stopped') break;
+    }
+    return awaited.get(item.id) || { status: 'queued' };
+  } finally { awaited.delete(item.id); }
+}
+/** Send the outbox in order. Returns 'done' (outbox empty) or 'stopped' (offline, or not signed in yet). */
+function flush() {
+  if (!LIVE || !sb || !liveReady) return Promise.resolve('stopped');
+  if (!flushRun) flushRun = runFlush().finally(() => { flushRun = null; });
+  return flushRun;
+}
+async function runFlush() {
+  let refused = 0, stopped = false, refreshed = false;
   while (outbox.length) {
     const item = outbox[0];
-    const { error } = await sb.rpc('apply_changes', { p_changes: item.changes, p_log: item.log, p_undo: item.undo });
-    if (error) {
-      const network = !navigator.onLine || /fetch|network|timeout|load failed/i.test(error.message || '');
-      if (network) { ok = false; break; }
-      outbox.shift();
-      toast(/exclu|overlap|conflict/i.test(error.message) ? 'Not saved: another phone booked this chair at that time.' : 'Not saved: ' + error.message, null, true);
-      ok = false;
-    } else outbox.shift();
-    store(OUTBOX_KEY, outbox);
+    let res;
+    try { res = await sb.rpc('apply_changes', { p_changes: item.changes, p_log: item.log, p_undo: item.undo }); }
+    catch (e) { res = { error: { message: String(e && e.message || e), code: '' }, status: 0 }; }
+    const error = res && res.error, status = res && res.status;
+    if (!error) { finish(item, { status: 'saved' }); recentSaves.push({ t: Date.now(), changes: item.changes }); backoff = 0; continue; }
+    const kind = classify(error, status);
+    if (kind === 'auth' && !refreshed) {
+      refreshed = true;   // the sign-in token expired: get a new one, then try the same item again
+      try { const r = await sb.auth.refreshSession(); if (r && !r.error) continue; } catch (e) { /* offline */ }
+    }
+    if (kind === 'retry' || kind === 'auth') {
+      if (kind === 'retry' && !isNetworkError(error, status) && ++item.tries >= MAX_TRIES) { refuse(item, 'tries', error); refused++; continue; }
+      saveOutbox(); stopped = true; scheduleRetry(); break;
+    }
+    refuse(item, kind, error); refused++;
   }
-  flushing = false;
+  const cut = Date.now() - 60000; recentSaves = recentSaves.filter(x => x.t > cut);
   UI.pending = outbox.length;
   renderHeaderOnly();
-  if (!outbox.length && !ok) await loadLive();
-  return ok;
+  if (refused) { if (appShown()) render(); loadLive(); }   // the server is the source of truth
+  return stopped ? 'stopped' : 'done';
 }
-window.addEventListener('online', () => { if (LIVE) flush().then(() => loadLive()); });
-setInterval(() => { if (LIVE && outbox.length) flush(); }, 20000);
+function finish(item, result) {
+  outbox = outbox.filter(x => x !== item); saveOutbox();
+  if (awaited.has(item.id)) awaited.set(item.id, result);
+}
+function refuse(item, kind, error) {
+  const reason = reasonText(kind, error);
+  revertLocal(item.changes);
+  if (item.log) DB.log = DB.log.filter(l => l.id !== item.log.id);
+  if (item.undo) { const e = DB.log.find(l => l.id === item.undo); if (e) e.undone = false; }
+  const waiting = awaited.has(item.id);
+  // An undo the person is waiting for only needs a message: nothing they typed is lost.
+  if (!(waiting && item.undo)) { UI.failed.push({ id: item.id, label: item.label, reason, at: new Date().toISOString() }); saveFailed(); }
+  if (!waiting) toast('Not saved: ' + item.label + '. ' + reason, null, true);
+  if (kind !== 'conflict' && kind !== 'overlap') reportError('Save refused: ' + (error && error.code || kind), (error && error.message || '') + ' | ' + item.label);
+  finish(item, { status: 'refused', kind, reason });
+}
+function scheduleRetry() {
+  backoff = Math.min(60000, backoff ? backoff * 2 : 2000);
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => { if (outbox.length) flush(); }, backoff);
+}
+/** Remove one refused save from the list ('all' clears the list). */
+function dismissFailed(id) {
+  UI.failed = id === 'all' ? [] : UI.failed.filter(f => String(f.id) !== String(id));
+  saveFailed();
+  if (appShown()) render();
+}
 
+const QUEUED = ' · saved on this phone, sends when online';
 async function commit(label, tx, opts = {}) {
   const changes = tx.changes();
-  if (!changes.length) return;
+  if (!changes.length) return 'none';
   applyLocal(changes);
   const entry = { id: uid(), at: new Date().toISOString(), by_name: UI.user, label, changes, undone: false };
   DB.log.unshift(entry);
   render();
-  const ok = await persist(changes, entry);
-  if (!opts.quiet) toast(ok || !LIVE ? label : label + ' · saved on this phone, sends when online', entry.id);
+  const r = await persistItem(changes, entry, null, label);
+  if (r.status === 'refused') toast('Not saved: ' + label + '. ' + r.reason, null, true);
+  else if (!opts.quiet) toast(r.status === 'saved' ? label : label + QUEUED, entry.id);
+  if (LIVE && r.status !== 'refused') saveSnapshotSoon();
+  return r.status;
 }
 function sameRow(cur, after) {
   if (after === null) return !cur;
@@ -699,26 +853,31 @@ function sameRow(cur, after) {
 }
 async function undo(entryId) {
   const e = DB.log.find(l => l.id === entryId);
-  if (!e || e.undone) return;
-  const blocked = e.changes.find(c => !sameRow(DB[TABLE[c.table]].find(r => r.id === c.id), c.after));
-  if (blocked) { toast('This was changed again later. Undo the later change first.', null, true); return; }
-  const rev = e.changes.map(c => ({ table: c.table, id: c.id, before: c.after, after: c.before }));
+  if (!e || e.undone) return 'none';
+  // Demo: check here. Live: the server checks each row (`before`) and refuses when it changed later.
+  if (!LIVE && e.changes.some(c => !sameRow(DB[TABLE[c.table]].find(r => r.id === c.id), c.after))) {
+    toast('This was changed again later. Undo the later change first.', null, true); return 'refused';
+  }
+  const rev = e.changes.map(c => ({ table: c.table, id: c.id, before: clone(c.after), after: clone(c.before) }));
   applyLocal(rev);
   e.undone = true;
   render();
-  await persist(rev, null, e.id);
-  toast('Undone: ' + e.label);
+  const r = await persistItem(rev, null, e.id, 'Undo: ' + e.label);
+  if (r.status === 'saved') toast('Undone: ' + e.label);
+  else if (r.status === 'queued') toast('Undone: ' + e.label + QUEUED);
+  else toast(r.kind === 'conflict' ? 'Not undone. This was changed again later. Undo the later change first.' : 'Not undone. ' + r.reason, null, true);
+  return r.status;
 }
 
 /* ---------- toast ---------- */
 let toastTimer;
 function toast(msg, undoId, isErr) {
-  const t = $('#toast');
+  const t = $('#toast'); if (!t) return;
   t.className = 'toast' + (isErr ? ' err' : '');
   t.innerHTML = '<span>' + esc(msg) + '</span>' + (undoId ? '<button data-act="undo" data-id="' + undoId + '">Undo</button>' : '');
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
+  toastTimer = setTimeout(() => { t.hidden = true; }, isErr ? 9000 : 6000);
 }
 
 /* ---------- demo data ---------- */
@@ -805,36 +964,291 @@ function loadDemo(fresh) {
   const data = s && s.seededFor === today() ? s : Object.assign(seedDemo(), { seededFor: today() });
   ['doctors', 'patients', 'appts', 'blocks', 'staff', 'requests'].forEach(k => { DB[k] = data[k] || []; });
   DB.log = data.log || [];
+  DB.config = normConfig(data.config);
   const c = store(STORE_KEY + '-clock');
   if (c && !fresh) demoClock = { min: c.min, realAt: Date.now() - (c.elapsed || 0), real: !!c.real };
   setRole(store(STORE_KEY + '-role') || 'receptionist');
   saveDemo();
 }
 function saveDemo() {
-  store(STORE_KEY, { seededFor: today(), doctors: DB.doctors, patients: DB.patients, appts: DB.appts, blocks: DB.blocks, staff: DB.staff, requests: DB.requests, log: DB.log.slice(0, 200) });
+  store(STORE_KEY, { seededFor: today(), doctors: DB.doctors, patients: DB.patients, appts: DB.appts, blocks: DB.blocks, staff: DB.staff, requests: DB.requests, log: DB.log.slice(0, 200), config: DB.config });
   store(STORE_KEY + '-clock', { min: demoClock.min, elapsed: Date.now() - demoClock.realAt, real: demoClock.real });
 }
 function setRole(r) { UI.role = r; UI.user = ROLE_NAME[r] || r; }
 
-/* ---------- live (Supabase) ---------- */
-function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
-async function initLive() {
-  await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js');
-  sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
-  const { data } = await sb.auth.getSession();
-  if (!data.session) return renderLogin();
-  await afterLogin();
+/* ---------- clinic settings ---------- */
+/** Admin: change clinic settings (closed dates and weekdays). Returns true when saved. */
+async function saveConfig(patch) {
+  const next = normConfig(Object.assign({}, DB.config, patch));
+  if (!LIVE) { DB.config = next; saveDemo(); render(); return true; }
+  let res;
+  try { res = await sb.from('app_config').upsert(Object.assign({ id: 1 }, next)); }
+  catch (e) { res = { error: { message: String(e && e.message || e) } }; }
+  if (res && res.error) { toast('Not saved: clinic settings. ' + res.error.message, null, true); return false; }
+  DB.config = next;
+  saveSnapshotSoon();
+  if (appShown()) render();
+  return true;
 }
-async function afterLogin() {
-  const { data: u } = await sb.auth.getUser();
-  const { data: staff } = await sb.from('staff').select('*').eq('user_id', u.user.id).maybeSingle();
-  if (!staff) { await sb.auth.signOut(); return renderLogin('Your account waits for the admin to approve it. Ask the admin to open More > Staff.'); }
+
+/* ---------- error reports (live only, throttled, never throws) ---------- */
+let errTimes = [], reporting = false;
+const errSeen = new Map();
+function reportError(message, detail) {
+  try {
+    if (!LIVE || !sb || reporting) return;
+    const msg = String(message || 'Error').slice(0, 500), now = Date.now();
+    errTimes = errTimes.filter(t => now - t < 60000);
+    if (errTimes.length >= 10) return;
+    if (now - (errSeen.get(msg) || 0) < 10 * 60000) return;
+    errSeen.set(msg, now); errTimes.push(now);
+    reporting = true;
+    const info = String(detail ?? '').slice(0, 3500) + '\n' + (UI.user || '') + ' · ' + (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+    Promise.resolve(sb.from('client_errors').insert({ version: VERSION, message: msg, detail: info })).then(() => {}, () => {});
+  } catch (e) { /* never report a report */ } finally { reporting = false; }
+}
+window.addEventListener('error', e => reportError(e.message || 'Script error', [e.filename, e.lineno, e.colno].join(':') + (e.error && e.error.stack ? '\n' + e.error.stack : '')));
+window.addEventListener('unhandledrejection', e => { const r = e.reason; reportError('Unhandled: ' + (r && r.message || String(r)), r && r.stack || ''); });
+async function refreshErrorCount() {
+  if (!LIVE || !sb || !isAdmin()) { DB.errorCount = 0; return; }
+  const since = new Date(Date.now() - 7 * 864e5).toISOString();
+  try {
+    const { count, error } = await sb.from('client_errors').select('*', { count: 'exact', head: true }).gte('at', since);
+    if (!error && (count || 0) !== DB.errorCount) { DB.errorCount = count || 0; scheduleRender(); }
+  } catch (e) { /* table missing or offline: keep the old number */ }
+}
+
+/* ---------- new version check ---------- */
+async function checkVersion() {
+  if (!LIVE || DEV_BUILD || typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('version.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json(), ready = !!(j && j.version && j.version !== VERSION);
+    if (ready !== UI.updateReady) { UI.updateReady = ready; renderHeaderOnly(); if (appShown()) scheduleRender(); }
+  } catch (e) { /* offline */ }
+}
+
+/* ---------- live (Supabase) ---------- */
+const LIB_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+async function loadLib() {
+  if (window.supabase && window.supabase.createClient) return;
+  try { await loadScript('supabase.min.js'); } catch (e) { /* not next to the page: use the CDN */ }
+  if (!(window.supabase && window.supabase.createClient)) await loadScript(LIB_CDN);
+}
+let channel = null, loadSeq = 0, loaded = null, loadingSince = 0, eventsWhileLoading = [];
+let usingSnapshot = false, staleData = false, starting = null, startRetry = null, hiddenAt = 0;
+let recovering = typeof location !== 'undefined' && /type=recovery/.test(location.hash || '');
+const extraMonths = new Set();
+
+/** The signed-in user from the saved session. Works offline, before the library loads. */
+function storedUser() {
+  try {
+    const ref = new URL(CONFIG.supabaseUrl).hostname.split('.')[0];
+    const raw = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token'));
+    const u = raw && (raw.user || (raw.currentSession && raw.currentSession.user));
+    return u && u.id ? u : null;
+  } catch (e) { return null; }
+}
+/* Snapshot: the last data this phone loaded, so the site opens without internet. */
+let snapTimer;
+function saveSnapshot() {
+  if (!LIVE || !UI.userId || !liveReady) return;
+  const key = SNAP_KEY + UI.userId, from = addDays(today(), -14);
+  const full = () => ({ doctors: DB.doctors, patients: DB.patients, appts: DB.appts, blocks: DB.blocks, log: DB.log.slice(0, LOG_LIMIT), staff: DB.staff, requests: DB.requests, config: DB.config });
+  const small = () => Object.assign(full(), { appts: DB.appts.filter(a => a.date >= from), log: DB.log.slice(0, 10) });
+  for (const make of [full, small]) {
+    try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), role: UI.role, user: UI.user, userId: UI.userId, db: make() })); return; } catch (e) { /* too big: try smaller */ }
+  }
+  try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+}
+function saveSnapshotSoon() { clearTimeout(snapTimer); snapTimer = setTimeout(saveSnapshot, 3000); }
+function useSnapshot(userId) {
+  const s = store(SNAP_KEY + userId);
+  if (!s || !s.db) return false;
+  ['doctors', 'patients', 'appts', 'blocks', 'log', 'staff', 'requests'].forEach(k => { DB[k] = Array.isArray(s.db[k]) ? s.db[k] : []; });
+  DB.config = normConfig(s.db.config);
+  UI.role = s.role || 'receptionist'; UI.user = s.user || ROLE_NAME[UI.role] || 'Staff'; UI.userId = s.userId || userId;
+  outbox.forEach(item => applyLocal(item.changes)); // keep unsent changes on screen
+  UI.pending = outbox.length; UI.online = false;
+  usingSnapshot = true;
+  return true;
+}
+function clearSnapshots() {
+  try { Object.keys(localStorage).filter(k => k.indexOf(SNAP_KEY) === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+}
+
+/* Screens before the app: loading, could not start, sign in, new password. */
+const card = inner => `<div class="wrap"><div class="login card"><h1>bookassist</h1>${inner}</div></div>`;
+function renderLoading() { $('#app').innerHTML = card('<p class="muted" role="status">Loading the clinic data…</p>'); }
+function renderStartError(msg) {
+  $('#app').innerHTML = card(`<p class="err">${esc(msg || 'Could not connect to the database.')}</p>
+    <p class="hint">Check the internet. Then tap Retry.${outbox.length ? ' ' + outbox.length + ' unsent change' + (outbox.length > 1 ? 's stay' : ' stays') + ' on this phone.' : ''}</p>
+    <button class="btn primary" id="retryBtn">Retry</button>`);
+  $('#retryBtn').addEventListener('click', () => { renderLoading(); startLive(); });
+}
+
+/** The whole start-up. Demo: local data. Live: saved data first, then the network. */
+async function boot() {
+  if (!LIVE) { UI.online = true; loadDemo(); render(); return; }
+  UI.online = false;
+  const hashErr = /error_description=/.test(typeof location !== 'undefined' ? location.hash || '' : '');
+  const u = !recovering && !hashErr && storedUser();
+  if (u && useSnapshot(u.id)) render(); else renderLoading();
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('online', () => { if (liveReady) { flush(); if (staleData) loadLive(); } else resumeStart(); });
+  setInterval(() => { if (liveReady && outbox.length) flush(); }, 20000);
+  setInterval(checkVersion, 10 * 60000);
+  checkVersion();
+  await startLive();
+  if (hashErr && !liveReady) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+    renderLogin('The email link did not work. It may be old. Ask for a new link.', 'forgot');
+  }
+}
+const initLive = boot; // old name
+function startLive() {
+  if (!starting) starting = startLiveOnce().catch(e => startFailed(e)).finally(() => { starting = null; });
+  return starting;
+}
+async function startLiveOnce() {
+  if (liveReady) return;
+  if (!sb) {
+    try { await loadLib(); } catch (e) { return startFailed(e); }
+    sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+    sb.auth.onAuthStateChange(ev => {
+      // Do not call Supabase inside this callback: it can lock. Run after it.
+      if (ev === 'PASSWORD_RECOVERY') { recovering = true; setTimeout(() => renderNewPassword(), 0); }
+      if (ev === 'TOKEN_REFRESHED' && liveReady && outbox.length) setTimeout(flush, 0);
+    });
+  }
+  let res;
+  try { res = await sb.auth.getSession(); } catch (e) { res = { data: {}, error: e }; }
+  const session = res && res.data && res.data.session;
+  if (recovering) { if (session) renderNewPassword(); return; }
+  if (session) return afterLogin(session.user);
+  // No session. A network error while renewing it is not a sign-out: keep the saved data.
+  if (res && res.error && storedUser()) return startFailed(res.error);
+  usingSnapshot = false;
+  renderLogin();
+}
+/** Try the start again, but never over the sign-in or new-password form. */
+function resumeStart() {
+  if (!liveReady && !starting && storedUser() && !$('#loginForm') && !$('#pwForm')) startLive();
+}
+function startFailed(e) {
+  if (e) console.warn('start failed', e);
+  UI.online = false;
+  if (usingSnapshot && appShown()) {
+    renderHeaderOnly();
+    if (!startFailed.told) { startFailed.told = true; toast('No internet. Showing the data saved on this phone.'); }
+  } else if (!recovering) renderStartError('Could not connect to the database.');
+  clearTimeout(startRetry);
+  startRetry = setTimeout(resumeStart, 30000);
+}
+async function afterLogin(user) {
+  if (!user) {
+    const r = await sb.auth.getSession();
+    user = r && r.data && r.data.session && r.data.session.user;
+    if (!user) return renderLogin();
+  }
+  let res;
+  try { res = await sb.from('staff').select('*').eq('user_id', user.id).maybeSingle(); }
+  catch (e) { res = { error: { message: String(e && e.message || e) } }; }
+  if (recovering) return;
+  if (res.error) {
+    // Network or server problem. This does not mean "not on the staff list".
+    if (!usingSnapshot && useSnapshot(user.id)) render();
+    return startFailed(res.error);
+  }
+  if (!res.data) return signOut('Your account waits for the admin to approve it. Ask the admin to open More > Staff.');
+  const staff = res.data;
+  if (UI.userId && UI.userId !== staff.user_id) ['appts', 'log', 'staff', 'requests'].forEach(k => { DB[k] = []; });
   UI.role = staff.role; UI.user = staff.name; UI.userId = staff.user_id;
-  await loadLive();
-  sb.channel('clinic').on('postgres_changes', { event: '*', schema: 'public' }, () => { clearTimeout(afterLogin.t); afterLogin.t = setTimeout(() => { if (!outbox.length) loadLive(); }, 500); })
-    .subscribe(st => { UI.online = st === 'SUBSCRIBED'; renderHeaderOnly(); });
+  liveReady = true; startFailed.told = false;
+  if (!usingSnapshot) renderLoading();
+  const ok = await loadLive();
+  if (!ok && !usingSnapshot) { liveReady = false; return startFailed(); }
+  staleData = !ok; // showing saved data: read again when the connection comes back
+  usingSnapshot = false;
+  subscribe();
   flush();
 }
+function subscribe() {
+  if (channel || !sb) return;
+  let dropped = false;
+  channel = sb.channel('clinic').on('postgres_changes', { event: '*', schema: 'public' }, onRemote)
+    .subscribe(st => {
+      if (st === 'SUBSCRIBED') {
+        UI.online = true;
+        if (dropped || staleData) { dropped = false; loadLive(); flush(); } // missed events while away: read everything again
+      } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { UI.online = false; dropped = true; }
+      renderHeaderOnly();
+    });
+}
+function onVisibility() {
+  if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); return; }
+  checkVersion();
+  if (!liveReady) { resumeStart(); return; }
+  flush();
+  if (staleData || (hiddenAt && Date.now() - hiddenAt > 60000)) loadLive();
+}
+
+/* Live updates: apply each change as it comes. Unsent changes of this phone stay on top. */
+let renderTimer, staffTimer;
+function scheduleRender(ms = 250) {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    if (!appShown()) return;
+    const ae = document.activeElement, app = $('#app');
+    if (ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName) && app && app.contains(ae)) return scheduleRender(2000); // do not break typing
+    render();
+  }, ms);
+}
+function upsertRow(arr, row, front) {
+  const i = arr.findIndex(r => r.id === row.id);
+  if (i >= 0) arr[i] = row; else if (front) arr.unshift(row); else arr.push(row);
+}
+function onRemote(p) {
+  if (loadingSince) eventsWhileLoading.push(p);
+  applyRemote(p);
+  scheduleRender();
+  saveSnapshotSoon();
+}
+function applyRemote(p) {
+  const t = p.table, ev = p.eventType, nw = p.new && Object.keys(p.new).length ? p.new : null, old = p.old || {};
+  if (TABLE[t]) {
+    const arr = DB[TABLE[t]], id = nw ? nw.id : old.id;
+    if (id == null) return;
+    if (ev === 'DELETE') { const i = arr.findIndex(r => r.id === id); if (i >= 0) arr.splice(i, 1); }
+    else if (nw) upsertRow(arr, nw);
+    outbox.forEach(item => item.changes.forEach(c => { if (c.table === t && c.id === id) applyLocal([c]); }));
+  } else if (t === 'change_log') {
+    if (ev === 'DELETE') DB.log = DB.log.filter(l => l.id !== old.id);
+    else if (nw) {
+      upsertRow(DB.log, nw, true);
+      DB.log.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      if (DB.log.length > 150) DB.log.length = 150;
+    }
+  } else if (t === 'app_config') {
+    if (nw) DB.config = normConfig(nw);
+  } else if (t === 'staff' || t === 'staff_requests') {
+    const row = nw || old;
+    if (t === 'staff' && row.user_id === UI.userId && nw && nw.role) { UI.role = nw.role; UI.user = nw.name || UI.user; }
+    if (isAdmin()) { clearTimeout(staffTimer); staffTimer = setTimeout(refreshStaff, 500); }
+  }
+}
+async function refreshStaff() {
+  if (!sb || !isAdmin()) return;
+  try {
+    const [a, b] = await Promise.all([sb.from('staff').select('*').order('name'), sb.from('staff_requests').select('*')]);
+    if (!a.error) DB.staff = a.data;
+    if (!b.error) DB.requests = b.data;
+    scheduleRender();
+  } catch (e) { /* offline */ }
+}
+
 // Supabase sends at most 1000 rows per request. Read page by page (sorted by id) until a page is short.
 const PAGE = 1000;
 async function readAll(make) {
@@ -848,49 +1262,150 @@ async function readAll(make) {
 }
 // All appointments of one patient, also those outside the loaded window. Adds missing rows to DB so Tx can change them.
 async function apptsOfPatient(pid) {
-  if (LIVE) {
+  if (LIVE && sb) {
     const r = await readAll(() => sb.from('appointments').select('*').eq('patient_id', pid));
     if (!r.error) r.data.forEach(a => { if (!DB.appts.some(x => x.id === a.id)) DB.appts.push(a); });
   }
   return DB.appts.filter(a => a.patient_id === pid);
 }
+/** Load the appointments of a date's month when it is outside the loaded window (far past or far future). */
+async function ensureDate(date) {
+  if (!LIVE || !sb || !loaded || !date || (date >= loaded.from && date <= loaded.to)) return;
+  const m = date.slice(0, 7);
+  if (extraMonths.has(m)) return;
+  extraMonths.add(m);
+  const from = m + '-01', next = addDays(from, 32).slice(0, 7) + '-01';
+  const [a, b] = await Promise.all([readAll(() => sb.from('appointments').select('*').gte('date', from).lt('date', next)),
+    readAll(() => sb.from('blocks').select('*').gte('date', from).lt('date', next))]);
+  if (a.error || b.error) { extraMonths.delete(m); return; }
+  a.data.forEach(r => upsertRow(DB.appts, r));
+  b.data.forEach(r => upsertRow(DB.blocks, r));
+  outbox.forEach(item => applyLocal(item.changes));
+  scheduleRender(0);
+}
+async function loadConfig() {
+  try {
+    const { data, error } = await sb.from('app_config').select('*').eq('id', 1).maybeSingle();
+    return error ? null : normConfig(data);
+  } catch (e) { return null; }
+}
+/** Read everything again. Only one run counts: an older run that answers late is ignored. Returns true when loaded. */
 async function loadLive() {
-  const from = addDays(today(), -400), to = addDays(today(), 400);
+  if (!sb) return false;
+  const seq = ++loadSeq, startedAt = Date.now();
+  loadingSince = startedAt; eventsWhileLoading = [];
+  const from = addDays(today(), -WINDOW_BACK), to = addDays(today(), WINDOW_AHEAD), admin = isAdmin();
   const q = [sb.from('doctors').select('*').order('name'), readAll(() => sb.from('patients').select('*')),
     readAll(() => sb.from('appointments').select('*').gte('date', from).lte('date', to)), readAll(() => sb.from('blocks').select('*').gte('date', addDays(today(), -30))),
-    sb.from('change_log').select('*').order('at', { ascending: false }).limit(150)];
-  if (isAdmin()) q.push(sb.from('staff').select('*').order('name'), sb.from('staff_requests').select('*'));
-  const r = await Promise.all(q);
-  const err = r.find(x => x.error);
-  if (err) { UI.online = false; renderHeaderOnly(); toast('Could not load data: ' + err.error.message, null, true); return; }
-  Object.assign(DB, { doctors: r[0].data, patients: r[1].data, appts: r[2].data, blocks: r[3].data, log: r[4].data });
-  if (isAdmin()) { DB.staff = r[5].data; DB.requests = r[6].data; }
-  outbox.forEach(item => applyLocal(item.changes)); // keep unsent changes on screen
+    sb.from('change_log').select('*').order('at', { ascending: false }).limit(LOG_LIMIT), loadConfig(),
+    // Older visits with an open follow-up (for example "6 months"), so "Follow-ups due" and "Overdue" still show them.
+    readAll(() => sb.from('appointments').select('*').lt('date', from).eq('status', 'done').eq('followup_dismissed', false).gte('next_followup', addDays(today(), -365)))];
+  if (admin) q.push(sb.from('staff').select('*').order('name'), sb.from('staff_requests').select('*'));
+  let r;
+  try { r = await Promise.all(q); } catch (e) { r = [{ error: { message: String(e && e.message || e) } }]; }
+  if (seq !== loadSeq) return false;
+  loadingSince = 0;
+  const err = r.find(x => x && x.error);
+  if (err) {
+    UI.online = false; renderHeaderOnly();
+    if (navigator.onLine !== false && appShown()) toast('Could not load new data. ' + err.error.message, null, true);
+    return false;
+  }
+  Object.assign(DB, { doctors: r[0].data, patients: r[1].data, appts: r[2].data.concat(r[6].data.filter(a => !r[2].data.some(b => b.id === a.id))), blocks: r[3].data, log: r[4].data });
+  if (r[5]) DB.config = r[5];
+  if (admin) { DB.staff = r[7].data; DB.requests = r[8].data; }
+  loaded = { from, to }; extraMonths.clear(); staleData = false;
+  eventsWhileLoading.forEach(applyRemote); eventsWhileLoading = [];               // changes that came during the read
+  recentSaves.filter(x => x.t >= startedAt).forEach(x => applyLocal(x.changes)); // saves that finished during the read
+  outbox.forEach(item => applyLocal(item.changes));                                // unsent changes stay on screen
   UI.online = true; UI.pending = outbox.length;
   render();
+  saveSnapshot();
+  if (admin) refreshErrorCount(); else DB.errorCount = 0;
+  return true;
 }
-function renderLogin(msg, signup) {
+
+/** Sign out: clears unsent changes, saved data and the refused list on this phone. */
+async function signOut(msg) {
+  try { if (channel && sb) sb.removeChannel(channel); } catch (e) { /* ignore */ }
+  channel = null;
+  try { if (sb) await sb.auth.signOut({ scope: 'local' }); } catch (e) { /* offline */ }
+  try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token$/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+  outbox = []; saveOutbox();
+  UI.failed = []; saveFailed();
+  clearSnapshots(); clearTimeout(snapTimer);
+  liveReady = false; usingSnapshot = false; loadSeq++; loadingSince = 0;
+  ['doctors', 'patients', 'appts', 'blocks', 'log', 'staff', 'requests'].forEach(k => { DB[k] = []; });
+  DB.config = defaultConfig(); DB.errorCount = 0;
+  UI.userId = null; setRole('receptionist'); UI.pending = 0;
+  const sh = $('#sheet'); if (sh) { sh.hidden = true; sh.innerHTML = ''; }
+  renderLogin(msg);
+}
+
+/* Sign in, ask for access, forgot password. mode: false = sign in, true = ask for access, 'forgot'. */
+function renderLogin(msg, mode) {
+  const signup = mode === true, forgot = mode === 'forgot';
+  const intro = signup ? 'Ask for a staff account. The admin approves it.' : forgot ? 'Enter your email. We send you a link to set a new password.' : 'Sign in with your clinic staff account.';
   $('#app').innerHTML = `<div class="wrap"><form class="login card" id="loginForm">
-    <h1>bookassist</h1><p class="muted">${signup ? 'Ask for a staff account. The admin approves it.' : 'Sign in with your clinic staff account.'}</p>
+    <h1>bookassist</h1><p class="muted">${intro}</p>
     ${signup ? '<label class="field"><span class="label">Your name</span><input id="lgName" required></label>' : ''}
     <label class="field"><span class="label">Email</span><input id="lgEmail" type="email" autocomplete="username" required></label>
-    <label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required></label>
-    ${msg ? `<div class="${/approve|sent/.test(msg) ? 'hint' : 'err'}">${esc(msg)}</div>` : ''}
-    <button class="btn primary">${signup ? 'Ask for access' : 'Sign in'}</button>
-    <button type="button" class="btn" id="lgSwitch">${signup ? 'I have an account' : 'New staff? Ask for access'}</button></form></div>`;
-  $('#lgSwitch').addEventListener('click', () => renderLogin('', !signup));
+    ${forgot ? '' : `<label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="${signup ? 8 : 6}" required></label>`}
+    ${signup ? '<p class="hint" style="margin:0">Use at least 8 characters.</p>' : ''}
+    ${msg ? `<div class="${/approve|sent|changed/i.test(msg) && !/did not|could not/i.test(msg) ? 'hint' : 'err'}">${esc(msg)}</div>` : ''}
+    <button class="btn primary">${signup ? 'Ask for access' : forgot ? 'Send the link' : 'Sign in'}</button>
+    ${!signup && !forgot ? '<button type="button" class="linkbtn" id="lgForgot">Forgot password?</button>' : ''}
+    <button type="button" class="btn" id="lgSwitch">${signup || forgot ? 'Back to sign in' : 'New staff? Ask for access'}</button></form></div>`;
+  $('#lgSwitch').addEventListener('click', () => renderLogin('', signup || forgot ? false : true));
+  const fg = $('#lgForgot'); if (fg) fg.addEventListener('click', () => renderLogin('', 'forgot'));
   $('#loginForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const email = $('#lgEmail').value.trim(), password = $('#lgPass').value;
-    if (signup) {
-      const { error } = await sb.auth.signUp({ email, password, options: { data: { name: $('#lgName').value.trim() } } });
-      if (error) return renderLogin(error.message, true);
-      await sb.auth.signOut();
-      return renderLogin('Request sent. You can sign in after the admin approves it.');
+    const btn = $('#loginForm .btn.primary'); btn.disabled = true;
+    const email = $('#lgEmail').value.trim(), password = forgot ? '' : $('#lgPass').value;
+    try {
+      if (forgot) {
+        const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+        if (error) return renderLogin('Could not send the link. ' + error.message, 'forgot');
+        return renderLogin('Link sent. Check your email. Open the link on this phone.');
+      }
+      if (signup) {
+        if (password.length < 8) return renderLogin('Use at least 8 characters for the password.', true);
+        const { error } = await sb.auth.signUp({ email, password, options: { data: { name: $('#lgName').value.trim() } } });
+        if (error) return renderLogin(error.message, true);
+        await sb.auth.signOut();
+        return renderLogin('Request sent. You can sign in after the admin approves it.');
+      }
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return renderLogin(/fetch|network/i.test(error.message || '') ? 'Could not connect. Check the internet.' : 'Sign-in failed. Check the email and password.');
+      renderLoading();
+      await afterLogin(data && data.user);
+    } catch (err) {
+      renderLogin('Could not connect. Check the internet.', mode);
     }
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return renderLogin('Sign-in failed. Check the email and password.');
-    afterLogin();
+  });
+}
+/* After the email link: set a new password. */
+function renderNewPassword(msg) {
+  $('#app').innerHTML = `<div class="wrap"><form class="login card" id="pwForm"><h1>bookassist</h1>
+    <p class="muted">Set a new password. Use at least 8 characters.</p>
+    <label class="field"><span class="label">New password</span><input id="pwNew" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label class="field"><span class="label">Type it again</span><input id="pwAgain" type="password" autocomplete="new-password" minlength="8" required></label>
+    ${msg ? `<div class="err">${esc(msg)}</div>` : ''}
+    <button class="btn primary">Save password</button></form></div>`;
+  $('#pwForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = $('#pwNew').value, again = $('#pwAgain').value;
+    if (pw.length < 8) return renderNewPassword('Use at least 8 characters.');
+    if (pw !== again) return renderNewPassword('The two passwords are not the same.');
+    $('#pwForm .btn').disabled = true;
+    let res;
+    try { res = await sb.auth.updateUser({ password: pw }); } catch (err) { res = { error: { message: 'Check the internet.' } }; }
+    if (res.error) return renderNewPassword('Could not save the password. ' + res.error.message);
+    recovering = false;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (err) { /* ignore */ }
+    renderLoading();
+    await afterLogin(res.data && res.data.user);
+    toast('Password changed.');
   });
 }
 
@@ -936,12 +1451,43 @@ function defaultDoctor(date, chair, start) {
   return top || (activeDoctors().find(d => !d.specialist) || activeDoctors()[0] || {}).id;
 }
 
+/* Clinic closed days: holidays (closed_dates) and weekly closed days (closed_weekdays, 0 = Sunday). */
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function clinicConfig() {
+  const c = (typeof DB !== 'undefined' && DB.config) || {};
+  return { closed_dates: Array.isArray(c.closed_dates) ? c.closed_dates : [], closed_weekdays: Array.isArray(c.closed_weekdays) ? c.closed_weekdays.map(Number) : [0] };
+}
+function isClosed(date) {
+  if (!date) return false;
+  const c = clinicConfig();
+  return c.closed_dates.includes(date) || c.closed_weekdays.includes(new Date(date + 'T00:00:00').getDay());
+}
+function closedWeekdaysText() {
+  const w = clinicConfig().closed_weekdays.slice().sort((x, y) => ((x + 6) % 7) - ((y + 6) % 7));
+  return w.length ? w.map(i => WEEKDAY[i] + 's').join(', ') : 'None';
+}
+/** A whole number of minutes from user input, kept between lo and hi. Returns null for bad input. */
+function wholeMinutes(v, lo = 1, hi = 240) {
+  const n = Math.round(Number(v));
+  if (!isFinite(n) || String(v).trim() === '') return null;
+  return Math.min(hi, Math.max(lo, n));
+}
+/** The appointment, if another phone did not remove or change it. Otherwise tells the user and re-renders. */
+function liveAppt(id, statuses) {
+  const a = appt(id);
+  if (a && (!statuses || statuses.includes(a.status))) return a;
+  closeSheet();
+  toast('This appointment changed on another phone.', null, true);
+  render();
+  return null;
+}
+
 /* ===== Render ===== */
 function render() {
   if (!UI.date) UI.date = today();
   const scroll = window.scrollY;
   const views = { day: dayHTML, queue: queueHTML, patients: patientsHTML, insights: insightsHTML, more: moreHTML };
-  $('#app').innerHTML = headerHTML() + `<main class="wrap">${views[UI.tab]()}</main>` + tabsHTML();
+  $('#app').innerHTML = headerHTML() + `<main class="wrap">${noticesHTML()}${views[UI.tab]()}</main>` + tabsHTML();
   if (UI.autoScroll) {
     UI.autoScroll = false;
     const nl = $('.nowline');
@@ -949,6 +1495,18 @@ function render() {
   } else window.scrollTo(0, scroll);
 }
 function renderHeaderOnly() { const h = $('.top'); if (h) h.outerHTML = headerHTML(); }
+/* Notices at the top of every tab: saves the server refused, and a new version. Both come from state, so they survive re-renders. */
+function noticesHTML() {
+  let out = '';
+  if (UI.updateReady) out += `<div class="banner upd" role="status"><span>A new version is ready.</span><button class="btn sm dark" data-act="reload">Reload</button></div>`;
+  const f = Array.isArray(UI.failed) ? UI.failed : [];
+  if (f.length) out += `<section class="card failed" role="alert"><h2 class="section-h" style="margin:0 0 4px">${f.length} change${f.length > 1 ? 's were' : ' was'} not saved</h2>
+    ${f.map(x => `<div class="hrow"><div><div class="lbl">${esc(x.label || 'Change')}</div><div class="hint">${esc(x.reason || '')}</div></div>
+      <button class="btn sm" data-act="dismissfail" data-id="${esc(x.id)}">Dismiss</button></div>`).join('')}
+    <p class="hint" style="margin:6px 0 0">The server refused ${f.length > 1 ? 'these changes' : 'this change'}. Check the calendar. Make the change again if needed.</p>
+    ${f.length > 1 ? '<button class="btn sm" style="justify-self:start;margin-top:8px" data-act="dismissfail" data-id="all">Dismiss all</button>' : ''}</section>`;
+  return out;
+}
 
 const MARK = `<svg class="mark" viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="7" width="13" height="18" rx="6.5" fill="var(--blue)"/><rect x="13" y="3" width="13" height="18" rx="6.5" fill="var(--spec)"/><circle cx="14" cy="14" r="4" fill="var(--accent)"/></svg>`;
 const ICONS = {
@@ -966,8 +1524,8 @@ function headerHTML() {
   const start = addDays(d, -((new Date(d + 'T00:00:00').getDay() + 6) % 7));
   let week = '';
   for (let i = 0; i < 7; i++) {
-    const x = addDays(start, i), load = S.dayLoad(DB.appts, x), r = load.booked / load.total;
-    week += `<button class="wd ${x === d ? 'sel' : ''} ${x === T ? 'today' : ''}" data-act="date" data-d="${x}" aria-label="${fmtDate(x, { weekday: 'long', day: 'numeric', month: 'long' })}, ${load.booked} of ${load.total} slots booked">
+    const x = addDays(start, i), load = S.dayLoad(DB.appts, x), r = load.booked / load.total, shut = isClosed(x);
+    week += `<button class="wd ${x === d ? 'sel' : ''} ${x === T ? 'today' : ''} ${shut ? 'closed' : ''}" data-act="date" data-d="${x}" aria-label="${fmtDate(x, { weekday: 'long', day: 'numeric', month: 'long' })}, ${shut ? 'clinic closed, ' : ''}${load.booked} of ${load.total} slots booked">
       <small>${fmtDate(x, { weekday: 'short' })}</small><b>${+x.slice(8)}<i class="${r >= .85 ? 'full' : r > 0 ? 'busy' : ''}"></i></b></button>`;
   }
   const status = UI.pending ? `<span class="chip warn">Offline · ${UI.pending} waiting</span>` : '';
@@ -996,7 +1554,7 @@ function tilesHTML(d) {
     let late = 0;
     [1, 2].forEach(ch => S.project(DB.appts, d, ch, n).forEach(p => { if (!['done', 'in_treatment'].includes(p.appt.status)) late = Math.max(late, p.delay); }));
     let free = 0;
-    [1, 2].forEach(ch => { for (let s = Math.max(S.OPEN, S.ceilTo(n, 30)); s < S.CLOSE; s += 30) if (!S.chairConflicts(DB.appts, { id: '_', date: d, chair: ch, start_min: s, duration_min: 30 }).length) free++; });
+    if (!isClosed(d)) [1, 2].forEach(ch => { for (let s = Math.max(S.OPEN, S.ceilTo(n, 30)); s < S.CLOSE; s += 30) if (!S.chairConflicts(DB.appts, { id: '_', date: d, chair: ch, start_min: s, duration_min: 30 }).length) free++; });
     const calls = callList().length;
     return `<div class="tiles">
       <button class="tile t-mint" data-act="tab" data-t="queue"><span class="label">Waiting</span><span class="big">${waiting}</span><span class="note">In the waiting area</span></button>
@@ -1025,6 +1583,8 @@ function dayHTML() {
   const d = UI.date, T = today();
   let out = `<div class="hello"><h1>${d === T ? greeting() + ', ' + esc(firstName(UI.user)) : fmtDate(d, { weekday: 'long' })}</h1>
     <p>${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>`;
+  const closed = isClosed(d);
+  if (closed) out += `<div class="banner closed"><b>Clinic closed on this day.</b><span>Existing bookings still show. Use the + button to book anyway.</span></div>`;
   out += tilesHTML(d);
   if (d === T) out += attentionHTML();
   const ot = overtimeOn(d);
@@ -1046,7 +1606,7 @@ function dayHTML() {
     if (H * ROW > ahTop) html += `<div class="after-hours" style="top:${ahTop}px;height:${H * ROW - ahTop}px"></div>`;
     blks.forEach(b => { html += `<div class="resv" style="top:${(b.start_min - S.OPEN) / 30 * ROW}px;height:${(b.end_min - b.start_min) / 30 * ROW}px"><span>Reserved · ${esc(doctor(b.doctor_id).name)}</span></div>`; });
     rows.forEach((s, i) => {
-      if (s >= S.CLOSE || (d === T && s + 30 <= n)) return;
+      if (closed || s >= S.CLOSE || (d === T && s + 30 <= n)) return;
       if (active.some(a => S.overlaps(a, { start_min: s, duration_min: 30 }))) return;
       const b = blks.find(x => s >= x.start_min && s < x.end_min);
       html += `<button class="free ${b ? 'inres' : ''}" style="top:${i * ROW + 3}px;height:${ROW - 6}px" data-act="book" data-ch="${ch}" data-s="${s}" aria-label="Book chair ${ch} at ${hm(s)}">+ ${b ? esc(doctor(b.doctor_id).name) : 'Free'}</button>`;
@@ -1070,7 +1630,7 @@ function dayHTML() {
   out += `<div class="gridwrap" style="--cols:${chairs.length}"><div class="chairhead"><div></div>${head}</div>
     <div class="grid"><div class="tcol" style="height:${H * ROW}px">${times}</div>${cols}${now}</div></div>
     <div class="legend"><span><i style="background:var(--sky)"></i>Clinic doctor</span><span><i style="background:var(--lilac)"></i>Specialist</span><span><i class="rs"></i>Reserved</span><span><i style="background:var(--mint)"></i>Waiting</span><span><i style="background:var(--peach)"></i>In chair</span></div>
-    <p class="hint" style="margin:0">Tap a free slot to book it. Tap a chair name to reserve it for a specialist.</p>`;
+    <p class="hint" style="margin:0">${closed ? 'The clinic is closed on this day. Free slots are hidden.' : 'Tap a free slot to book it.'} Tap a chair name to reserve it for a specialist.</p>`;
   return out;
 }
 function fuRow(a, overdue) {
@@ -1096,7 +1656,9 @@ function callListHTML() {
 }
 function queueHTML() {
   const T = today();
-  let out = `<div class="hello"><h1>Today's queue</h1><p>${fmtDate(T, { weekday: 'long', day: 'numeric', month: 'long' })}</p></div>`;
+  let out = `<div class="hello qtop"><div><h1>Today's queue</h1><p>${fmtDate(T, { weekday: 'long', day: 'numeric', month: 'long' })}</p></div>
+    <button class="btn sm" data-act="print" aria-label="Print today's list">Print</button></div>`;
+  if (isClosed(T)) out += `<div class="banner closed"><b>Clinic closed today.</b></div>`;
   out += callListHTML();
   out += `<div class="row"><button class="btn grow" data-act="delay">Doctor running late</button><button class="btn grow" data-act="moveday">Move a doctor's day</button></div>`;
   const n = nowMin();
@@ -1114,7 +1676,17 @@ function queueHTML() {
     noShows.forEach(a => out += queueRow({ appt: a, pStart: a.start_min, delay: 0 }, n, T));
     out += '</div></section>';
   });
-  return out;
+  return out + printHTML(T);
+}
+/* Paper fallback: a clean list per chair. Hidden on screen. Only this shows when the page prints. */
+function printHTML(T) {
+  const at = new Date();
+  return `<section class="print-only" aria-hidden="true"><h1>BookAssist · ${fmtDate(T, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h1>
+    <p>Printed at ${at.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}.</p>
+    ${[1, 2].map(ch => { const list = DB.appts.filter(a => a.date === T && a.chair === ch && a.status !== 'cancelled').sort((x, y) => x.start_min - y.start_min);
+      return `<h2>Chair ${ch}</h2>${list.length ? `<table><thead><tr><th>Time</th><th>Patient</th><th>Phone</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead><tbody>
+        ${list.map(a => { const p = patient(a.patient_id); return `<tr><td>${hm(a.start_min)}</td><td>${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(doctor(a.doctor_id).name)}</td><td>${esc(a.treatment_done || a.reason || '')}</td><td>${STATUS[a.status] || esc(a.status)}${a.kind === 'walkin' ? ' · Walk-in' : ''}</td></tr>`; }).join('')}</tbody></table>`
+        : '<p>No patients.</p>'}`; }).join('')}</section>`;
 }
 function queueRow(p, n, T) {
   const a = p.appt, doc = doctor(a.doctor_id);
@@ -1149,8 +1721,9 @@ function patientRows(q) {
   let list = patientSummary();
   if (q) list = list.filter(r => r.p.name.toLowerCase().includes(q) || (dq.length >= 3 && digits(r.p.phone).includes(dq)));
   list.sort((x, y) => ((y.next || y.last || {}).date || '').localeCompare((x.next || x.last || {}).date || ''));
+  if (!DB.patients.length) return `<div class="card empty">No patients yet. Book the first patient with the + button.</div>`;
   if (!list.length) return `<div class="card empty">No patient matches "${esc(q)}". Book a new patient with the + button.</div>`;
-  return list.slice(0, 50).map(r => `<button class="prow" data-act="patient" data-id="${r.p.id}"><b class="pav">${esc(r.p.name[0])}</b>
+  return list.slice(0, 50).map(r => `<button class="prow" data-act="patient" data-id="${r.p.id}"><b class="pav">${esc(String(r.p.name || '?')[0])}</b>
     <span class="pmain"><b>${esc(r.p.name)}</b><small>${esc(r.p.phone)} · ${r.visits} visit${r.visits === 1 ? '' : 's'}</small></span>
     <span class="pside">${r.next ? `<span class="chip acc">${fmtDate(r.next.date, { day: 'numeric', month: 'short' })}</span>` : r.last ? `<small>Last ${fmtDate(r.last.date, { day: 'numeric', month: 'short' })}</small>` : ''}</span></button>`).join('');
 }
@@ -1256,19 +1829,22 @@ function moreHTML() {
     out += `<section class="card"><h2 class="section-h">Staff</h2>
       ${DB.requests.length ? `<div class="label" style="margin-bottom:6px">Waiting for approval</div>${DB.requests.map(r => `<div class="hrow"><div><div class="lbl">${esc(r.name || r.email)}</div><div class="hint">${esc(r.email || '')}</div></div>
         <div class="row" style="gap:6px;flex-wrap:nowrap"><select class="minisel" id="rq-${esc(r.user_id)}">${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === 'receptionist' ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
-        <button class="btn sm primary" data-act="approve" data-id="${esc(r.user_id)}">Approve</button><button class="btn sm" data-act="decline" data-id="${esc(r.user_id)}">✕</button></div></div>`).join('')}` : ''}
+        <button class="btn sm primary" data-act="approve" data-id="${esc(r.user_id)}">Approve</button><button class="btn sm" data-act="decline" data-id="${esc(r.user_id)}" aria-label="Decline ${esc(r.name || r.email)}">✕</button></div></div>`).join('')}` : ''}
       ${DB.staff.map(s => `<div class="hrow"><div><div class="lbl">${esc(s.name)}</div></div><div class="row" style="gap:6px;flex-wrap:nowrap">
         <select class="minisel" data-uid="${esc(s.user_id)}" ${s.user_id === UI.userId ? 'disabled' : ''}>${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === s.role ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
         ${s.user_id === UI.userId ? '' : `<button class="btn sm danger" data-act="unstaff" data-id="${esc(s.user_id)}">Remove</button>`}</div></div>`).join('')}
       <p class="hint" style="margin:6px 0 0">New staff tap "New staff? Ask for access" on the sign-in screen. Their request shows here.</p></section>`;
   }
+  out += clinicDaysHTML();
+  if (isAdmin() && DB.errorCount > 0) out += `<section class="card"><h2 class="section-h">App errors</h2><p style="margin:0">App errors in the last 7 days: <b>${+DB.errorCount}</b></p><p class="hint" style="margin:4px 0 0">Tell Prem.</p></section>`;
   const th = store(THEME_KEY) || 'auto';
   out += `<section class="card"><h2 class="section-h">Appearance</h2><div class="seg" role="group" aria-label="Theme">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div>
     <p class="hint" style="margin:8px 0 0">Auto follows the phone setting. This choice is saved on this phone only.</p></section>`;
   out += `<section class="card"><h2 class="section-h">Clinic rules</h2><dl class="kv"><dt>Hours</dt><dd>10:00 AM to 9:00 PM</dd><dt>Slot</dt><dd>30 minutes</dd>
+    <dt>Closed</dt><dd>${esc(closedWeekdaysText())}${clinicConfig().closed_dates.some(x => x >= today()) ? ' and the closed dates under Clinic days' : ''}</dd>
     <dt>Chairs</dt><dd>Chair 1 and Chair 2</dd><dt>No-show</dt><dd>Suggested after 15 minutes late</dd><dt>Delays</dt><dd>Call list after a move, or 15+ minutes late</dd></dl></section>`;
   if (LIVE) out += `<section class="card"><h2 class="section-h">Account</h2><p>Signed in as <b>${esc(UI.user)}</b> (${esc(ROLE_NAME[UI.role] || UI.role)}).</p>
-    <p class="hint">Add this site to the home screen: open the browser menu, then tap "Add to Home Screen".</p><button class="btn" data-act="signout">Sign out</button></section>`;
+    <p class="hint">Add this site to the home screen: open the browser menu, then tap "Add to Home Screen".</p>${outbox.length ? `<p class="hint bad-t">${outbox.length} change${outbox.length > 1 ? 's are' : ' is'} not sent yet.</p>` : ''}<button class="btn" data-act="signout">Sign out</button></section>`;
   else {
     const cm = Math.floor(nowMin());
     out += `<section class="card" style="display:grid;gap:12px"><h2 class="section-h" style="margin:0">Demo controls</h2>
@@ -1281,18 +1857,67 @@ function moreHTML() {
   return out;
 }
 
+/* Clinic days: weekly closed days and closed dates. The admin edits them. Other staff see them. */
+function clinicDaysHTML() {
+  const c = clinicConfig(), T = today(), admin = isAdmin();
+  const dates = c.closed_dates.filter(x => x >= T).sort();
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const week = admin
+    ? `<div class="wkdays" role="group" aria-label="Closed every week">${order.map(i => { const on = c.closed_weekdays.includes(i);
+        return `<button class="${on ? 'on' : ''}" data-act="cfgwd" data-v="${i}" aria-pressed="${on}" aria-label="${WEEKDAY[i]}">${WEEKDAY[i].slice(0, 3)}</button>`; }).join('')}</div>
+       <p class="hint" style="margin:0">Tap a day to open or close it every week. Dark days are closed.</p>`
+    : `<p style="margin:0">${esc(closedWeekdaysText())}</p>`;
+  const list = dates.length ? dates.map(x => `<div class="hrow"><div class="lbl">${fmtDate(x, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</div>
+      ${admin ? `<button class="btn sm danger" data-act="cfgdel" data-d="${x}">Remove</button>` : ''}</div>`).join('')
+    : '<p class="hint" style="margin:0">No closed dates ahead.</p>';
+  return `<section class="card" style="display:grid;gap:10px"><h2 class="section-h" style="margin:0">Clinic days</h2>
+    <div class="label">Closed every week</div>${week}
+    <div class="label">Closed dates</div><div>${list}</div>
+    ${admin ? `<div class="row"><label class="field grow"><span class="label">Date</span><input id="cfgDate" type="date" min="${T}"></label><button class="btn primary" data-act="cfgadd" style="align-self:end">Add closed day</button></div><div id="cfgMsg"></div>`
+      : '<p class="hint" style="margin:0">Only the admin can change clinic days.</p>'}</section>`;
+}
+async function setConfig(patch, label) {
+  if (typeof saveConfig === 'function') await saveConfig(patch);
+  else { DB.config = Object.assign(clinicConfig(), patch); render(); }
+  if (label) toast(label);
+}
+function addClosedDate() {
+  const inp = $('#cfgDate'), d = inp && inp.value, msg = $('#cfgMsg');
+  const say = t => { if (msg) msg.innerHTML = `<div class="err">${t}</div>`; };
+  if (!d) return say('Pick a date first.');
+  if (d < today()) return say('Pick today or a later date.');
+  const c = clinicConfig();
+  if (isClosed(d)) return say('The clinic is already closed on ' + fmtDate(d) + '.');
+  const busy = DB.appts.filter(a => a.date === d && S.isActive(a) && a.status !== 'done').length;
+  setConfig({ closed_dates: c.closed_dates.concat([d]).sort() }, 'Clinic closed on ' + fmtDate(d) + '.' + (busy ? ' ' + busy + ' booking' + (busy > 1 ? 's stay' : ' stays') + ' on this day. Move them if needed.' : ''));
+}
+
 /* ===== Sheets ===== */
+let sheetOpener = null;
 function openSheet(html, bind) {
   const sh = $('#sheet');
-  sh.innerHTML = `<div class="panel" role="dialog" aria-modal="true">${html}</div>`;
+  if (sh.hidden) sheetOpener = document.activeElement;
+  sh.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">${html}</div>`;
   sh.hidden = false;
   const panel = $('.panel', sh);
   panel.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheet));
   if (bind) bind(panel);
+  try { panel.focus({ preventScroll: true }); } catch (e) { panel.focus(); }
 }
-function closeSheet() { const sh = $('#sheet'); sh.hidden = true; sh.innerHTML = ''; }
+function closeSheet() {
+  const sh = $('#sheet'), wasOpen = !sh.hidden;
+  sh.hidden = true; sh.innerHTML = '';
+  if (wasOpen && sheetOpener && sheetOpener.isConnected && sheetOpener.focus) { try { sheetOpener.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+  sheetOpener = null;
+}
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
-const sheetHead = t => `<div class="panel-h"><h3>${t}</h3><button class="iconbtn" data-close aria-label="Close">×</button></div>`;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) { e.preventDefault(); closeSheet(); } });
+const sheetHead = t => `<div class="panel-h"><h3 id="sheetTitle">${t}</h3><button class="iconbtn" data-close aria-label="Close">×</button></div>`;
+/* Shown instead of a booking form when the clinic has no active doctor. */
+function noDoctorSheet() {
+  openSheet(sheetHead('No doctors yet') + `<p style="margin:0">Add a doctor first in More &gt; Doctors.</p>
+    ${isAdmin() ? '<button class="btn primary" data-act="tab" data-t="more">Open More</button>' : '<p class="hint" style="margin:0">Only the admin can add doctors.</p>'}`);
+}
 const doctorOptions = sel => DB.doctors.filter(d => d.active !== false || d.id === sel).map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${d.specialist ? ' — ' + esc(d.specialty || 'Specialist') : ''}</option>`).join('');
 const quick = (id, list, sel) => `<div class="quick" id="${id}">${list.map(x => `<button type="button" class="${String(x) === String(sel) ? 'on' : ''}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
 function bindQuick(panel, qid, inputId) {
@@ -1355,6 +1980,8 @@ const REPEAT = [['', 'Once', 0, 1], ['7x2', 'Weekly, 2 visits', 7, 2], ['7x3', '
 function bookSheet(pre = {}) {
   closeSheet();
   const a = pre.id ? appt(pre.id) : null;
+  if (pre.id && !a) { liveAppt(pre.id); return; }
+  if (!a && !activeDoctors().length) { noDoctorSheet(); return; }
   const p = a ? patient(a.patient_id) : pre.patient || {};
   const date = a ? a.date : pre.date || UI.date;
   const chair = a ? a.chair : pre.chair || 1;
@@ -1394,10 +2021,13 @@ function bookSheet(pre = {}) {
       if (r.doctor.length) warns.push(`${esc(doctor(c.doctor_id).name)} is also in Chair ${r.doctor[0].chair} at ${hm(r.doctor[0].start_min)} with ${esc(patient(r.doctor[0].patient_id).name)}.`);
       if (r.reserved) warns.push(`Chair ${c.chair} is reserved for ${esc(doctor(r.reserved.doctor_id).name)} from ${hm(r.reserved.start_min)} to ${hm(r.reserved.end_min)}.`);
       if (r.overtime) warns.push(`This ends at ${hm(S.end(c))}, after 9:00 PM. Check with the doctor.`);
+      if (c.date && isClosed(c.date)) warns.push(`The clinic is closed on ${fmtDate(c.date)}.`);
       let series = '';
       if (!a && rep()[3] > 1) {
         const plan = S.planSeries(DB.appts, DB.blocks, c, rep()[2], rep()[3]);
-        series = `<div class="card soft"><div class="label">Also books</div>${plan.map(v => `<div class="srow ${v.overtime ? 'bad-t' : ''}">${fmtDate(v.date)} · ${hm(v.start_min)} · Chair ${v.chair}${v.sameTime ? '' : ' <span class="chip warn">time changed</span>'}</div>`).join('')}</div>`;
+        const shut = plan.filter(v => isClosed(v.date)).length;
+        if (shut) warns.push(`${shut} later visit${shut > 1 ? 's fall' : ' falls'} on a closed day.`);
+        series = `<div class="card soft"><div class="label">Also books</div>${plan.map(v => `<div class="srow ${v.overtime ? 'bad-t' : ''}">${fmtDate(v.date)} · ${hm(v.start_min)} · Chair ${v.chair}${v.sameTime ? '' : ' <span class="chip warn">time changed</span>'}${isClosed(v.date) ? ' <span class="chip bad">clinic closed</span>' : ''}</div>`).join('')}</div>`;
       }
       if (g('fSeries')) g('fSeries').innerHTML = series;
       confirm = warns.join(' ');
@@ -1437,6 +2067,8 @@ function bookSheet(pre = {}) {
 function walkInSheet() {
   closeSheet();
   const T = today();
+  if (!activeDoctors().length) { noDoctorSheet(); return; }
+  const shut = isClosed(T);
   openSheet(sheetHead('Add walk-in') + `<form id="wk" style="display:grid;gap:12px">
     ${patientFields({})}
     <label class="field"><span class="label">Doctor</span><select id="fDoc">${doctorOptions(defaultDoctor(T, 1, nowMin()))}</select></label>
@@ -1454,9 +2086,10 @@ function walkInSheet() {
       place = S.placeWalkIn(DB.appts, T, +g('fDur').value, nowMin(), ch ? [ch] : [1, 2], g('fDoc').value, DB.blocks);
       g('fPlace').innerHTML = `<div class="label">Goes to</div><div style="font-size:19px;font-weight:900">Chair ${place.chair} at ${hm(place.start)}</div>
         <div class="hint">${place.gap ? 'This is the first gap where the chair and ' + esc(doctor(g('fDoc').value).name) + ' are both free.' : 'No free gap today. This is the end of the queue.'}</div>
-        ${place.overtime ? '<div class="banner warn" style="margin-top:8px">This goes past 9:00 PM. Check with the doctor.</div>' : ''}`;
-      g('fSave').textContent = place.overtime ? 'Add after 9 PM anyway' : 'Add to queue';
-      g('fSave').className = 'btn ' + (place.overtime ? 'warn' : 'primary');
+        ${place.overtime ? '<div class="banner warn" style="margin-top:8px">This goes past 9:00 PM. Check with the doctor.</div>' : ''}
+        ${shut ? '<div class="banner warn" style="margin-top:8px">The clinic is closed today.</div>' : ''}`;
+      g('fSave').textContent = place.overtime ? 'Add after 9 PM anyway' : shut ? 'Add anyway' : 'Add to queue';
+      g('fSave').className = 'btn ' + (place.overtime || shut ? 'warn' : 'primary');
     };
     ['fChair', 'fDur', 'fDoc'].forEach(id => g(id).addEventListener('change', calc));
     calc();
@@ -1473,7 +2106,7 @@ function walkInSheet() {
 }
 
 function apptSheet(id) {
-  const a = appt(id); if (!a) return;
+  const a = liveAppt(id); if (!a) return;
   const p = patient(a.patient_id), doc = doctor(a.doctor_id), T = today(), n = nowMin();
   const late = S.noShowDue(a, n, T);
   let actions = '';
@@ -1504,7 +2137,7 @@ function apptSheet(id) {
       <button class="btn grow" data-act="bookfor" data-id="${a.id}">Book again</button></div>`, panel => {
     const cb = $('#cancelBtn', panel);
     if (cb) cb.addEventListener('click', () => {
-      if (cb.dataset.sure) { const tx = Tx(); tx.update('appointments', a.id, { status: 'cancelled' }); closeSheet(); commit('Cancelled ' + p.name + ' · ' + hm(a.start_min), tx); }
+      if (cb.dataset.sure) { if (!liveAppt(a.id)) return; const tx = Tx(); tx.update('appointments', a.id, { status: 'cancelled' }); closeSheet(); commit('Cancelled ' + p.name + ' · ' + hm(a.start_min), tx); }
       else { cb.dataset.sure = '1'; cb.textContent = 'Tap again to cancel'; cb.className = 'btn warn grow'; }
     });
   });
@@ -1568,7 +2201,8 @@ function patientSheet(pid) {
 }
 
 function noteSheet(id) {
-  const a = appt(id), p = patient(a.patient_id);
+  const a = liveAppt(id, ['done']); if (!a) return;
+  const p = patient(a.patient_id);
   const fu = [['1 week', 7], ['2 weeks', 14], ['1 month', 30], ['3 months', 90], ['6 months', 180]];
   openSheet(sheetHead('Visit note · ' + esc(p.name)) + `<form id="nt" style="display:grid;gap:12px">
     <label class="field"><span class="label">Treatment done</span><input id="nTreat" value="${esc(a.treatment_done || a.reason || '')}"></label>
@@ -1583,6 +2217,7 @@ function noteSheet(id) {
     $('#nt', panel).addEventListener('submit', async e => {
       e.preventDefault();
       const nf = $('#nFu', panel).value || null, nd = $('#nDoc', panel).value;
+      if (!liveAppt(a.id, ['done'])) return;
       const tx = Tx(); tx.update('appointments', a.id, { treatment_done: $('#nTreat', panel).value.trim(), plan: $('#nPlan', panel).value.trim(), next_followup: nf, note_doctor_id: nd, followup_dismissed: false });
       closeSheet();
       await commit('Visit note for ' + p.name, tx);
@@ -1596,7 +2231,7 @@ function noteSheet(id) {
 }
 
 /* Preview of moves before applying. Overtime rows are red. Staff can still proceed. */
-function previewSheet(title, moves, extraTx, label, after) {
+function previewSheet(title, moves, extraTx, label, after, note) {
   const ot = moves.filter(m => m.overtime);
   const rows = moves.map(m => {
     const a = appt(m.id), af = Object.assign({}, a, m.after);
@@ -1607,10 +2242,12 @@ function previewSheet(title, moves, extraTx, label, after) {
   }).join('');
   openSheet(sheetHead(title) + `
     ${ot.length ? `<div class="banner warn"><b>${ot.length} appointment${ot.length > 1 ? 's go' : ' goes'} past 9:00 PM.</b><span>Check with the doctor before you proceed.</span></div>` : ''}
+    ${note ? `<div class="banner warn">${note}</div>` : ''}
     ${moves.length ? `<div><div class="label">${moves.length} appointment${moves.length > 1 ? 's' : ''} will move</div>${rows}</div>` : '<p class="hint">No other appointments move.</p>'}
     ${moves.length ? '<p class="hint" style="margin:0">These patients go on the call list in Queue. You can undo this from More > History.</p>' : ''}
     <div class="row"><button class="btn grow" data-close>Cancel</button><button class="btn ${ot.length ? 'warn' : 'primary'} grow" id="pvGo">${ot.length ? 'Proceed anyway' : 'Proceed'}</button></div>`, panel => {
     $('#pvGo', panel).addEventListener('click', async () => {
+      if (moves.some(m => !appt(m.id))) { liveAppt(null); return; }
       const tx = extraTx || Tx();
       moves.forEach(m => tx.update('appointments', m.id, moveFields(appt(m.id), m.after)));
       closeSheet();
@@ -1621,6 +2258,7 @@ function previewSheet(title, moves, extraTx, label, after) {
 }
 /* Apply moves now, or preview first when any move goes past closing time. */
 function applyWithMoves(tx, moves, label, after) {
+  if (moves.some(m => !appt(m.id))) { liveAppt(null); return; }
   if (moves.some(m => m.overtime)) return previewSheet(label, moves, tx, label, after);
   moves.forEach(m => tx.update('appointments', m.id, moveFields(appt(m.id), m.after)));
   closeSheet();
@@ -1632,17 +2270,18 @@ function delaySheet() {
   const withAppts = DB.doctors.filter(d => DB.appts.some(a => a.date === T && a.doctor_id === d.id && S.MOVABLE.includes(a.status)));
   if (!withAppts.length) { toast('No doctor has waiting patients today.'); return; }
   const def = (withAppts.find(d => d.specialist) || withAppts[0]).id;
-  openSheet(sheetHead('Doctor running late') + `<form id="dl" style="display:grid;gap:12px">
+  openSheet(sheetHead('Doctor running late') + `<form id="dl" style="display:grid;gap:12px" novalidate>
     <label class="field"><span class="label">Doctor</span><select id="dDoc">${withAppts.map(d => `<option value="${d.id}" ${d.id === def ? 'selected' : ''}>${esc(d.name)}${d.specialist ? ' — ' + esc(d.specialty) : ''}</option>`).join('')}</select></label>
-    <label class="field"><span class="label">Late by (minutes)</span><input id="dMin" type="number" inputmode="numeric" min="5" step="5" value="30"></label>
+    <label class="field"><span class="label">Late by (minutes)</span><input id="dMin" type="number" inputmode="numeric" min="1" max="240" step="1" value="30"></label>
     ${quick('dQ', [15, 30, 45, 60, 90], 30)}
     <p class="hint" style="margin:0">The site moves this doctor's waiting patients. It also pushes later patients in the same chair, without double booking any doctor.</p>
-    <button class="btn primary">Show the new times</button></form>`, panel => {
+    <div id="dMsg"></div><button class="btn primary">Show the new times</button></form>`, panel => {
     bindQuick(panel, 'dQ', 'dMin');
     $('#dl', panel).addEventListener('submit', e => {
       e.preventDefault();
-      const docId = $('#dDoc', panel).value, mins = +$('#dMin', panel).value;
-      if (!(mins > 0)) return;
+      const docId = $('#dDoc', panel).value, mins = wholeMinutes($('#dMin', panel).value, 1, 240);
+      if (mins === null) { $('#dMsg', panel).innerHTML = '<div class="err">Enter the minutes as a whole number, 1 to 240.</div>'; return; }
+      $('#dMin', panel).value = mins;
       const moves = S.shiftDoctor(DB.appts, T, docId, mins, nowMin());
       previewSheet(esc(doctor(docId).name) + ' late by ' + mins + ' min', moves, null, doctor(docId).name + ' late by ' + mins + ' min · ' + moves.length + ' moved', () => { UI.tab = 'queue'; UI.autoScroll = true; render(); });
     });
@@ -1657,7 +2296,7 @@ function moveDaySheet() {
   openSheet(sheetHead("Move a doctor's day") + `<div style="display:grid;gap:12px">
     <p class="hint" style="margin:0">Moves all open appointments of one doctor from ${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'short' })}. A reservation moves with them.</p>
     <label class="field"><span class="label">Doctor</span><select id="mDoc">${docs.map(x => `<option value="${x.id}" ${x.id === def ? 'selected' : ''}>${esc(x.name)}${x.specialist ? ' — ' + esc(x.specialty) : ''}</option>`).join('')}</select></label>
-    <div><div class="label" style="margin-bottom:6px">Best days in the next 2 weeks</div><div id="mDays" class="days"></div></div>
+    <div><div class="label" style="margin-bottom:6px">Best open days in the next 2 weeks</div><div id="mDays" class="days"></div></div>
     <label class="field"><span class="label">Or pick a date</span><input id="mDate" type="date" min="${today()}"></label></div>`, panel => {
     const go = to => {
       const docId = $('#mDoc', panel).value;
@@ -1665,13 +2304,14 @@ function moveDaySheet() {
       const moves = S.moveDoctorDay(DB.appts, d, docId, to, DB.blocks);
       const tx = Tx();
       DB.blocks.filter(b => b.doctor_id === docId && b.date === d).forEach(b => tx.update('blocks', b.id, { date: to }));
-      previewSheet('Move ' + esc(doctor(docId).name) + ' to ' + fmtDate(to), moves, tx, 'Moved ' + doctor(docId).name + ' · ' + fmtDate(d) + ' → ' + fmtDate(to) + ' · ' + moves.length + ' patients', () => { UI.date = to; UI.autoScroll = true; render(); });
+      previewSheet('Move ' + esc(doctor(docId).name) + ' to ' + fmtDate(to), moves, tx, 'Moved ' + doctor(docId).name + ' · ' + fmtDate(d) + ' → ' + fmtDate(to) + ' · ' + moves.length + ' patients', () => { UI.date = to; UI.autoScroll = true; render(); },
+        isClosed(to) ? 'The clinic is closed on ' + fmtDate(to) + '.' : '');
     };
     const draw = () => {
       const docId = $('#mDoc', panel).value;
-      const days = S.findDays(DB.appts, d, docId, 14, DB.blocks).filter(x => new Date(x.date + 'T00:00:00').getDay() !== 0);
+      const days = S.findDays(DB.appts, d, docId, 14, DB.blocks).filter(x => !isClosed(x.date));
       days.sort((x, y) => x.late - y.late || x.shifted - y.shifted || x.load.booked - y.load.booked);
-      $('#mDays', panel).innerHTML = days.slice(0, 5).map(x => `<button type="button" class="dayopt" data-d="${x.date}"><b>${fmtDate(x.date, { weekday: 'short', day: 'numeric', month: 'short' })}</b>
+      $('#mDays', panel).innerHTML = (days.length ? '' : '<p class="hint" style="margin:0">The clinic is closed on all of the next 14 days. Pick a date below.</p>') + days.slice(0, 5).map(x => `<button type="button" class="dayopt" data-d="${x.date}"><b>${fmtDate(x.date, { weekday: 'short', day: 'numeric', month: 'short' })}</b>
         <span>${x.late ? `<span class="chip bad">${x.late} after 9 PM</span>` : x.shifted ? `<span class="chip warn">${x.total - x.shifted} same time, ${x.shifted} shifted</span>` : `<span class="chip ok">All ${x.total} keep their time</span>`}</span>
         <small>${x.load.free} free slots that day</small></button>`).join('');
     };
@@ -1683,7 +2323,8 @@ function moveDaySheet() {
 }
 
 function startSheet(id) {
-  const a = appt(id), p = patient(a.patient_id);
+  const a = liveAppt(id, ['arrived']); if (!a) return;
+  const p = patient(a.patient_id);
   const est0 = a.duration_min;
   openSheet(sheetHead('Start · ' + esc(p.name)) + `<form id="st" style="display:grid;gap:12px">
     <div class="field"><span class="label">How long will this treatment take?</span>
@@ -1692,7 +2333,7 @@ function startSheet(id) {
     <button class="btn primary">Start now</button></form>`, panel => {
     bindQuick(panel, 'sQ', 'sEst');
     const eff = () => {
-      const est = +$('#sEst', panel).value, n = Math.round(nowMin());
+      const est = wholeMinutes($('#sEst', panel).value, 1, 240) || est0, n = Math.round(nowMin());
       const moves = S.afterStart(DB.appts, a, n, est);
       $('#sEff', panel).innerHTML = `<div class="label">Ends about ${hm(n + est)}</div><div class="hint">${moves.length ? moves.length + ' later patient' + (moves.length > 1 ? 's move' : ' moves') + ': ' + moves.map(m => esc(patient(appt(m.id).patient_id).name.split(' ')[0]) + ' → ' + hm(m.after.start_min)).join(', ') : 'No other patient moves.'}</div>`;
       return { est, n, moves };
@@ -1701,6 +2342,7 @@ function startSheet(id) {
     eff();
     $('#st', panel).addEventListener('submit', e => {
       e.preventDefault();
+      if (!liveAppt(id, ['arrived'])) return;
       const { est, n, moves } = eff();
       const tx = Tx();
       tx.update('appointments', id, { status: 'in_treatment', started_min: n, start_min: n, duration_min: est, sched_min: a.sched_min ?? a.start_min, booked_min: a.booked_min ?? a.duration_min, arrived_min: a.arrived_min ?? n });
@@ -1742,13 +2384,14 @@ function monthSheet(base) {
   for (let k = 1; k <= daysIn; k++) {
     const d = m0.slice(0, 8) + pad(k), load = S.dayLoad(DB.appts, d), r = load.booked / load.total;
     const spec = chairDoctors(d, 0).some(x => x.specialist);
-    cells += `<button class="mday ${d === UI.date ? 'sel' : ''} ${d === T ? 'today' : ''}" data-act="pickday" data-d="${d}" style="--load:${Math.round(r * 100)}%" aria-label="${fmtDate(d, { day: 'numeric', month: 'long' })}, ${load.booked} booked">
+    const shut = isClosed(d);
+    cells += `<button class="mday ${d === UI.date ? 'sel' : ''} ${d === T ? 'today' : ''} ${shut ? 'closed' : ''}" data-act="pickday" data-d="${d}" style="--load:${Math.round(r * 100)}%" aria-label="${fmtDate(d, { day: 'numeric', month: 'long' })}, ${shut ? 'clinic closed, ' : ''}${load.booked} booked">
       <b>${k}</b>${spec ? '<i class="sp"></i>' : ''}<span class="lb"></span></button>`;
   }
   const prev = addDays(m0, -1).slice(0, 7) + '-01', next = addDays(m0, 32).slice(0, 7) + '-01';
   openSheet(sheetHead(fmtDate(m0, { month: 'long', year: 'numeric' })) + `
     <div class="row"><button class="iconbtn" data-act="monthnav" data-d="${prev}" aria-label="Previous month">‹</button><button class="iconbtn" data-act="monthnav" data-d="${next}" aria-label="Next month">›</button>
-      <span class="legend" style="margin-left:auto"><span><i style="background:var(--accent)"></i>Booked</span><span><i style="background:var(--spec);border-radius:50%"></i>Specialist</span></span></div>
+      <span class="legend" style="margin-left:auto"><span><i style="background:var(--accent)"></i>Booked</span><span><i style="background:var(--spec);border-radius:50%"></i>Specialist</span><span><i class="cl"></i>Closed</span></span></div>
     <div class="mgrid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<small>${x}</small>`).join('')}${cells}</div>`);
 }
 
@@ -1781,10 +2424,11 @@ function doctorSheet(id) {
 }
 
 /* ===== Actions ===== */
-function markArrived(id) { const a = appt(id), tx = Tx(); tx.update('appointments', id, { status: 'arrived', arrived_min: Math.round(nowMin()) }); closeSheet(); commit(patient(a.patient_id).name + ' arrived', tx); }
-function markNoShow(id) { const a = appt(id), tx = Tx(); tx.update('appointments', id, { status: 'no_show' }); closeSheet(); commit(patient(a.patient_id).name + ' marked no-show', tx); }
+function markArrived(id) { const a = liveAppt(id, ['booked']); if (!a) return; const tx = Tx(); tx.update('appointments', id, { status: 'arrived', arrived_min: Math.round(nowMin()) }); closeSheet(); commit(patient(a.patient_id).name + ' arrived', tx); }
+function markNoShow(id) { const a = liveAppt(id, ['booked']); if (!a) return; const tx = Tx(); tx.update('appointments', id, { status: 'no_show' }); closeSheet(); commit(patient(a.patient_id).name + ' marked no-show', tx); }
 function markLateArrival(id) {
-  const a = appt(id), n = nowMin(), tx = Tx();
+  const a = liveAppt(id, ['no_show']); if (!a) return;
+  const n = nowMin(), tx = Tx();
   const asArrived = Object.assign({}, a, { status: 'arrived' });
   let start = a.start_min;
   if (start + a.duration_min <= n || !S.isFree(DB.appts, [], asArrived, true)) {
@@ -1796,23 +2440,27 @@ function markLateArrival(id) {
   commit(patient(a.patient_id).name + ' arrived late · now ' + hm(start) + (start + a.duration_min > S.CLOSE ? ' (after 9 PM)' : ''), tx);
 }
 function markEnd(id) {
-  const a = appt(id), n = Math.round(nowMin()), st = a.started_min ?? a.start_min;
+  const a = liveAppt(id, ['in_treatment']); if (!a) return;
+  const n = Math.round(nowMin()), st = a.started_min ?? a.start_min;
   const moves = S.afterTreatmentEnd(DB.appts, a, n);
   const tx = Tx(); tx.update('appointments', id, { status: 'done', ended_min: n, start_min: st, duration_min: Math.max(5, n - st) });
   applyWithMoves(tx, moves, 'Finished ' + patient(a.patient_id).name, () => noteSheet(id));
 }
 function extend(id) {
-  const a = appt(id), moves = S.afterExtend(DB.appts, a, 15);
+  const a = liveAppt(id, ['in_treatment']); if (!a) return;
+  const moves = S.afterExtend(DB.appts, a, 15);
   const tx = Tx(); tx.update('appointments', id, { duration_min: a.duration_min + 15 });
   applyWithMoves(tx, moves, patient(a.patient_id).name + ' needs 15 more min');
 }
 function inform(id, kind, delay) {
-  const a = appt(id), tx = Tx();
-  tx.update('appointments', id, kind === 'moved' ? { informed: true } : { informed_delay: +delay });
+  const a = liveAppt(id, ['booked', 'arrived']); if (!a) return;
+  const tx = Tx();
+  tx.update('appointments', id, kind === 'moved' ? { informed: true } : { informed_delay: Math.max(0, Math.round(+delay || 0)) });
   commit('Told ' + patient(a.patient_id).name + ' about the new time', tx);
 }
 function dismissFollowup(id) {
-  const a = appt(id), tx = Tx(); tx.update('appointments', id, { followup_dismissed: true });
+  const a = liveAppt(id); if (!a) return;
+  const tx = Tx(); tx.update('appointments', id, { followup_dismissed: true });
   commit('Dismissed follow-up for ' + patient(a.patient_id).name, tx);
   if (!$('#sheet').hidden) listSheet('overdue');
 }
@@ -1823,7 +2471,14 @@ function copyText(v, btn) {
 async function staffAction(kind, userId, role) {
   if (LIVE) {
     let r;
-    if (kind === 'approve') { const q = DB.requests.find(x => x.user_id === userId); r = await sb.from('staff').insert({ user_id: userId, name: q.name || q.email, role }); if (!r.error) r = await sb.from('staff_requests').delete().eq('user_id', userId); }
+    if (kind === 'approve') {
+      // One atomic server call when the database has approve_staff. Older databases: the two-step way.
+      r = await sb.rpc('approve_staff', { p_user: userId, p_role: role });
+      if (r.error && /approve_staff|does not exist|could not find|PGRST202|schema cache/i.test(r.error.message || '') ) {
+        const q = DB.requests.find(x => x.user_id === userId) || {};
+        r = await sb.from('staff').insert({ user_id: userId, name: q.name || q.email, role }); if (!r.error) r = await sb.from('staff_requests').delete().eq('user_id', userId);
+      }
+    }
     if (kind === 'decline') r = await sb.from('staff_requests').delete().eq('user_id', userId);
     if (kind === 'role') r = await sb.from('staff').update({ role }).eq('user_id', userId);
     if (kind === 'remove') r = await sb.from('staff').delete().eq('user_id', userId);
@@ -1845,24 +2500,24 @@ document.addEventListener('click', e => {
   const id = el.dataset.id;
   switch (el.dataset.act) {
     case 'tab': closeSheet(); UI.tab = el.dataset.t; UI.autoScroll = true; render(); break;
-    case 'date': UI.date = el.dataset.d; UI.autoScroll = UI.tab === 'day'; if (UI.tab !== 'day' && UI.tab !== 'queue') UI.tab = 'day'; render(); break;
-    case 'shift': UI.date = addDays(UI.date, +el.dataset.n); render(); break;
+    case 'date': UI.date = el.dataset.d; UI.autoScroll = UI.tab === 'day'; if (UI.tab !== 'day' && UI.tab !== 'queue') UI.tab = 'day'; render(); ensureDate(UI.date); break;
+    case 'shift': UI.date = addDays(UI.date, +el.dataset.n); render(); ensureDate(UI.date); break;
     case 'month': monthSheet(); break;
     case 'monthnav': monthSheet(el.dataset.d); break;
-    case 'pickday': closeSheet(); UI.date = el.dataset.d; UI.tab = 'day'; UI.autoScroll = true; render(); break;
+    case 'pickday': closeSheet(); UI.date = el.dataset.d; UI.tab = 'day'; UI.autoScroll = true; render(); ensureDate(UI.date); break;
     case 'chairs': UI.chairs = +el.dataset.v; render(); break;
     case 'fab': fabSheet(); break;
     case 'book': bookSheet(el.dataset.ch ? { chair: +el.dataset.ch, start: +el.dataset.s } : {}); break;
     case 'walkin': walkInSheet(); break;
     case 'reserve': reserveSheet(+el.dataset.ch); break;
-    case 'unreserve': if (el.dataset.sure) { const b = DB.blocks.find(x => x.id === id), tx = Tx(); tx.remove('blocks', id); closeSheet(); commit('Removed reservation for ' + doctor(b.doctor_id).name, tx); }
+    case 'unreserve': if (el.dataset.sure) { const b = DB.blocks.find(x => x.id === id); closeSheet(); if (!b) { toast('This reservation changed on another phone.', null, true); render(); break; } const tx = Tx(); tx.remove('blocks', id); commit('Removed reservation for ' + doctor(b.doctor_id).name, tx); }
       else { el.dataset.sure = '1'; el.textContent = 'Tap again'; } break;
     case 'open': apptSheet(id); break;
     case 'patient': patientSheet(id); break;
     case 'bookpt': bookSheet({ patient: patient(id), date: UI.date }); break;
-    case 'edit': bookSheet({ id }); break;
-    case 'bookfor': { const a = appt(id); bookSheet({ patient: patient(a.patient_id), doctor_id: a.doctor_id, date: a.next_followup && a.next_followup >= today() ? a.next_followup : UI.date, reason: a.next_followup ? 'Follow-up' : '' }); break; }
-    case 'bookfu': { const a = appt(id); bookSheet({ patient: patient(a.patient_id), doctor_id: a.note_doctor_id || a.doctor_id, date: a.next_followup >= today() ? a.next_followup : today(), reason: 'Follow-up' }); break; }
+    case 'edit': if (liveAppt(id, ['booked', 'arrived', 'no_show'])) bookSheet({ id }); break;
+    case 'bookfor': { const a = liveAppt(id); if (!a) break; bookSheet({ patient: patient(a.patient_id), doctor_id: a.doctor_id, date: a.next_followup && a.next_followup >= today() ? a.next_followup : UI.date, reason: a.next_followup ? 'Follow-up' : '' }); break; }
+    case 'bookfu': { const a = liveAppt(id); if (!a) break; bookSheet({ patient: patient(a.patient_id), doctor_id: a.note_doctor_id || a.doctor_id, date: a.next_followup >= today() ? a.next_followup : today(), reason: 'Follow-up' }); break; }
     case 'dismissfu': dismissFollowup(id); break;
     case 'list': listSheet(el.dataset.l); break;
     case 'arrive': markArrived(id); break;
@@ -1886,7 +2541,23 @@ document.addEventListener('click', e => {
     case 'theme': store(THEME_KEY, el.dataset.v); applyTheme(el.dataset.v); render(); break;
     case 'role': setRole(el.dataset.v); store(STORE_KEY + '-role', el.dataset.v); render(); break;
     case 'reset': if (el.dataset.sure) { loadDemo(true); UI.date = today(); render(); toast('Demo data reset.'); } else { el.dataset.sure = '1'; el.textContent = 'Tap again to reset'; } break;
-    case 'signout': sb.auth.signOut().then(() => { outbox = []; store(OUTBOX_KEY, []); renderLogin(); }); break;
+    case 'signout': {
+      const left = outbox.length;
+      if (left && !el.dataset.sure) { el.dataset.sure = '1'; el.className = 'btn warn'; el.textContent = left + ' change' + (left > 1 ? 's' : '') + ' not sent. Tap again to sign out anyway'; break; }
+      if (typeof signOut === 'function') signOut();
+      else sb.auth.signOut().then(() => { outbox = []; store(OUTBOX_KEY, []); renderLogin(); });
+      break;
+    }
+    case 'reload': location.reload(); break;
+    case 'print': closeSheet(); window.print(); break;
+    case 'dismissfail':
+      if (typeof dismissFailed === 'function') dismissFailed(id);
+      else UI.failed = id === 'all' ? [] : (UI.failed || []).filter(x => String(x.id) !== String(id));
+      render(); break;
+    case 'cfgwd': if (isAdmin()) { const v = +el.dataset.v, w = clinicConfig().closed_weekdays;
+      setConfig({ closed_weekdays: w.includes(v) ? w.filter(x => x !== v) : w.concat([v]).sort() }, WEEKDAY[v] + (w.includes(v) ? ' is now open every week.' : ' is now closed every week.')); } break;
+    case 'cfgadd': if (isAdmin()) addClosedDate(); break;
+    case 'cfgdel': if (isAdmin()) { const d = el.dataset.d; setConfig({ closed_dates: clinicConfig().closed_dates.filter(x => x !== d) }, 'The clinic is open on ' + fmtDate(d) + '.'); } break;
   }
 });
 document.addEventListener('change', e => {
@@ -1911,15 +2582,26 @@ function showTip(e) {
 document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showTip(e); });
 document.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') showTip(e); });
 document.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
+/* Date rollover: when the app stays open past midnight, the calendar and queue move to the new today. */
+let lastToday = today();
+function checkNewDay() {
+  const t = today();
+  if (t === lastToday) return false;
+  if (UI.date === lastToday) UI.date = t;
+  lastToday = t;
+  return true;
+}
 setInterval(() => {
+  checkNewDay();
   const busy = !$('#sheet').hidden || (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName));
   if (!busy && document.visibilityState === 'visible' && $('.top')) render();
 }, 30000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && checkNewDay() && $('.top')) render(); });
 
 /* ===== Start ===== */
+(t => { if (t) { t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); } })($('#toast'));
 if (document.querySelector('link[rel=manifest]') && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-if (LIVE) initLive().catch(e => { $('#app').innerHTML = '<div class="wrap"><div class="login card"><h1>bookassist</h1><p class="err">Could not connect to the database. Check the internet and the settings in the file.</p></div></div>'; console.error(e); });
-else { UI.online = true; loadDemo(); render(); }
+boot();
 
 })();
 </script>
