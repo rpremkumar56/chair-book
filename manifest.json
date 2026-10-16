@@ -1,6 +1,6 @@
 {
-  "name": "Chair Book",
-  "short_name": "Chair Book",
+  "name": "BookAssist",
+  "short_name": "BookAssist",
   "description": "Appointments, chairs and queue for the clinic.",
   "start_url": "./",
   "scope": "./",

@@ -1,5 +1,5 @@
-/* Chair Book service worker: the site opens without internet. Data calls always go to the network. */
-const CACHE = 'chairbook-v3';
+/* BookAssist service worker: the site opens without internet. Data calls always go to the network. */
+const CACHE = 'bookassist-v4';
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

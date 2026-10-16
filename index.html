@@ -4,7 +4,7 @@
 <meta name="theme-color" content="#F5EEE3"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
-<title>Chair Book</title>
+<title>BookAssist</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap">
@@ -303,7 +303,7 @@ main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); displa
 const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0bHhhbXN1cGxybnN6ZGhpaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwOTc4NTAsImV4cCI6MjEwNzY3Mzg1MH0.W8kb9cw8xqWIrLCM2ZH7yVJvzDi_si0DE_DFhpWn7Zg" };
 </script>
 <script>
-/* Chair Book — scheduling logic. Pure functions, no DOM. Times are minutes from midnight.
+/* BookAssist — scheduling logic. Pure functions, no DOM. Times are minutes from midnight.
    `blocks` are specialist reservations: { id, date, chair, doctor_id, start_min, end_min }. */
 (function (root) {
   const SLOT = 30;          // slot length in minutes
@@ -593,6 +593,15 @@ const digits = s => String(s || '').replace(/\D/g, '').slice(-10);
 const hm = S.toHM;
 const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
 function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+// Theme: 'auto' follows the phone setting; 'light' or 'dark' is fixed. Saved on this phone only.
+const THEME_KEY = 'bookassist-theme';
+function applyTheme(t) {
+  const r = document.documentElement;
+  if (t === 'light' || t === 'dark') r.dataset.theme = t; else delete r.dataset.theme;
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.content = getComputedStyle(r).getPropertyValue('--bg').trim();
+}
+applyTheme(store(THEME_KEY));
 
 function today() { return ymd(new Date()); }
 function nowMin() {
@@ -843,7 +852,7 @@ async function loadLive() {
 }
 function renderLogin(msg, signup) {
   $('#app').innerHTML = `<div class="wrap"><form class="login card" id="loginForm">
-    <h1>chairbook</h1><p class="muted">${signup ? 'Ask for a staff account. The admin approves it.' : 'Sign in with your clinic staff account.'}</p>
+    <h1>bookassist</h1><p class="muted">${signup ? 'Ask for a staff account. The admin approves it.' : 'Sign in with your clinic staff account.'}</p>
     ${signup ? '<label class="field"><span class="label">Your name</span><input id="lgName" required></label>' : ''}
     <label class="field"><span class="label">Email</span><input id="lgEmail" type="email" autocomplete="username" required></label>
     <label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required></label>
@@ -930,6 +939,7 @@ const ICONS = {
   insights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V13M10 20V6M16 20v-9M22 20H2"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg>'
 };
+function firstName(n) { const w = String(n || '').split(/\s+/).filter(x => x && !/^(dr|mr|mrs|ms|prof)\.?$/i.test(x)); return w[0] || n; }
 function greeting() { const m = nowMin(); return m < 12 * 60 ? 'Good morning' : m < 17 * 60 ? 'Good afternoon' : 'Good evening'; }
 
 function headerHTML() {
@@ -943,7 +953,7 @@ function headerHTML() {
   }
   const status = UI.pending ? `<span class="chip warn">Offline · ${UI.pending} waiting</span>` : '';
   return `<header class="top"><div class="wrap">
-    <div class="top-row"><div class="brand">${MARK}chairbook${LIVE ? '' : '<span class="mode">Demo</span>'}</div>${status}
+    <div class="top-row"><div class="brand">${MARK}bookassist${LIVE ? '' : '<span class="mode">Demo</span>'}</div>${status}
       <div class="avatar"><span>${esc(UI.user)}<br><span class="mono">${hm(nowMin())}</span></span><b class="${UI.online && !UI.pending ? '' : 'off'}">${esc((UI.user || '?')[0])}</b></div></div>
     <div class="monthbar"><button class="monthbtn" data-act="month">${fmtDate(d, { month: 'long', year: 'numeric' })} <span aria-hidden="true">▾</span></button>
       ${d !== T ? '<button class="pill" data-act="date" data-d="' + T + '">Today</button>' : ''}
@@ -994,7 +1004,7 @@ function attentionHTML() {
 }
 function dayHTML() {
   const d = UI.date, T = today();
-  let out = `<div class="hello"><h1>${d === T ? greeting() + ', ' + esc(UI.user.split(' ')[0]) : fmtDate(d, { weekday: 'long' })}</h1>
+  let out = `<div class="hello"><h1>${d === T ? greeting() + ', ' + esc(firstName(UI.user)) : fmtDate(d, { weekday: 'long' })}</h1>
     <p>${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>`;
   out += tilesHTML(d);
   if (d === T) out += attentionHTML();
@@ -1233,6 +1243,9 @@ function moreHTML() {
         ${s.user_id === UI.userId ? '' : `<button class="btn sm danger" data-act="unstaff" data-id="${esc(s.user_id)}">Remove</button>`}</div></div>`).join('')}
       <p class="hint" style="margin:6px 0 0">New staff tap "New staff? Ask for access" on the sign-in screen. Their request shows here.</p></section>`;
   }
+  const th = store(THEME_KEY) || 'auto';
+  out += `<section class="card"><h2 class="section-h">Appearance</h2><div class="seg" role="group" aria-label="Theme">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div>
+    <p class="hint" style="margin:8px 0 0">Auto follows the phone setting. This choice is saved on this phone only.</p></section>`;
   out += `<section class="card"><h2 class="section-h">Clinic rules</h2><dl class="kv"><dt>Hours</dt><dd>10:00 AM to 9:00 PM</dd><dt>Slot</dt><dd>30 minutes</dd>
     <dt>Chairs</dt><dd>Chair 1 and Chair 2</dd><dt>No-show</dt><dd>Suggested after 15 minutes late</dd><dt>Delays</dt><dd>Call list after a move, or 15+ minutes late</dd></dl></section>`;
   if (LIVE) out += `<section class="card"><h2 class="section-h">Account</h2><p>Signed in as <b>${esc(UI.user)}</b> (${esc(ROLE_NAME[UI.role] || UI.role)}).</p>
@@ -1823,6 +1836,7 @@ document.addEventListener('click', e => {
     case 'approve': staffAction('approve', id, $('#rq-' + CSS.escape(id)).value); break;
     case 'decline': staffAction('decline', id); break;
     case 'unstaff': if (el.dataset.sure) staffAction('remove', id); else { el.dataset.sure = '1'; el.textContent = 'Tap again'; } break;
+    case 'theme': store(THEME_KEY, el.dataset.v); applyTheme(el.dataset.v); render(); break;
     case 'role': setRole(el.dataset.v); store(STORE_KEY + '-role', el.dataset.v); render(); break;
     case 'reset': if (el.dataset.sure) { loadDemo(true); UI.date = today(); render(); toast('Demo data reset.'); } else { el.dataset.sure = '1'; el.textContent = 'Tap again to reset'; } break;
     case 'signout': sb.auth.signOut().then(() => { outbox = []; store(OUTBOX_KEY, []); renderLogin(); }); break;
@@ -1857,7 +1871,7 @@ setInterval(() => {
 
 /* ===== Start ===== */
 if (document.querySelector('link[rel=manifest]') && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-if (LIVE) initLive().catch(e => { $('#app').innerHTML = '<div class="wrap"><div class="login card"><h1>chairbook</h1><p class="err">Could not connect to the database. Check the internet and the settings in the file.</p></div></div>'; console.error(e); });
+if (LIVE) initLive().catch(e => { $('#app').innerHTML = '<div class="wrap"><div class="login card"><h1>bookassist</h1><p class="err">Could not connect to the database. Check the internet and the settings in the file.</p></div></div>'; console.error(e); });
 else { UI.online = true; loadDemo(); render(); }
 
 })();
