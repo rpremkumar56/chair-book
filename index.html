@@ -1,0 +1,1866 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5EEE3"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Chair Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap">
+<style>
+/* Layout: phone-first. Wordmark + round day picker on top, greeting, pastel summary tiles,
+   two chair columns on a 30-minute grid, timeline queue. Floating + button, icon tab bar. */
+:root {
+  --bg: #F5EEE3; --surface: #FFFBF5; --sunk: #EDE4D6; --ink: #1E1E1E; --muted: #6E665C; --line: #E6DCCD;
+  --accent: #D96234; --on-accent: #FFFFFF; --navy: #26395C; --on-navy: #FFFFFF;
+  --blue: #40628D; --blue-soft: #DDE6F1; --spec: #796194; --spec-soft: #E9E1F1; --forest: #333F2F;
+  --peach: #FADBC6; --mint: #DCEDCF; --lilac: #E4D9F2; --sky: #D5E3F0;
+  --ok: #3B7637; --ok-soft: #DCEED2; --warn: #B45C14; --warn-soft: #FBE4CE; --bad: #B4322A; --bad-soft: #F7DAD5;
+  --f-display: "Nunito", "SF Pro Rounded", ui-rounded, system-ui, sans-serif;
+  --f-body: "Nunito", "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
+  --row: 60px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161B17; --surface: #20271F; --sunk: #1A201B; --ink: #F3EDE2; --muted: #A69E92; --line: #303A30;
+  --accent: #EE7B4C; --on-accent: #1E140E; --navy: #A8BDE3; --on-navy: #13203A;
+  --blue: #93B0D8; --blue-soft: #233246; --spec: #BCA5DB; --spec-soft: #2F273B; --forest: #A9B99E;
+  --peach: #43301F; --mint: #26361F; --lilac: #2F2840; --sky: #1F2D3C;
+  --ok: #95CF8B; --ok-soft: #23361F; --warn: #F0A660; --warn-soft: #3D2A16; --bad: #F2948A; --bad-soft: #42201C;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #161B17; --surface: #20271F; --sunk: #1A201B; --ink: #F3EDE2; --muted: #A69E92; --line: #303A30;
+  --accent: #EE7B4C; --on-accent: #1E140E; --navy: #A8BDE3; --on-navy: #13203A;
+  --blue: #93B0D8; --blue-soft: #233246; --spec: #BCA5DB; --spec-soft: #2F273B; --forest: #A9B99E;
+  --peach: #43301F; --mint: #26361F; --lilac: #2F2840; --sky: #1F2D3C;
+  --ok: #95CF8B; --ok-soft: #23361F; --warn: #F0A660; --warn-soft: #3D2A16; --bad: #F2948A; --bad-soft: #42201C;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); }
+.top-row { display: flex; align-items: center; gap: 10px; padding-block: 12px 4px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--f-display); font-weight: 900; font-size: 24px; letter-spacing: -0.03em; color: var(--accent); }
+.mark { width: 28px; height: 28px; flex: none; }
+.mode { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--spec); background: var(--spec-soft);
+  padding: 3px 8px; border-radius: 999px; }
+.avatar { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); text-align: right; line-height: 1.2; }
+.avatar b { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--peach); color: var(--accent); font-size: 16px; font-weight: 900; position: relative; }
+.avatar b::after { content: ""; position: absolute; right: 0; bottom: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); }
+.avatar b.off::after { background: var(--bad); }
+.monthbar { display: flex; align-items: center; gap: 6px; padding-block: 6px 4px; }
+.monthbar strong { font-weight: 800; font-size: 14px; flex: 1; }
+.iconbtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 17px; line-height: 1; display: grid; place-items: center; }
+.pill { border: 0; background: var(--ink); color: var(--bg); border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 800; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding-block: 4px 12px; }
+.wd { border: 0; background: none; padding: 0; display: grid; gap: 6px; justify-items: center; }
+.wd small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.wd b { display: grid; place-items: center; width: min(44px, 11vw); aspect-ratio: 1; max-width: 100%; border-radius: 50%; background: var(--surface);
+  font-weight: 700; font-size: 16px; position: relative; }
+.wd b i { position: absolute; bottom: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+.wd b i.busy { background: var(--accent); }
+.wd b i.full { background: var(--bad); }
+.wd.today b { box-shadow: inset 0 0 0 2px var(--accent); }
+.wd.sel small { color: var(--ink); font-weight: 800; }
+.wd.sel b { background: var(--ink); color: var(--bg); box-shadow: none; }
+.wd.sel b i { background: var(--bg); }
+
+main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 16px; }
+.hello h1 { font-family: var(--f-display); font-weight: 900; font-size: 30px; letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
+.hello p { margin: 4px 0 0; color: var(--muted); font-weight: 600; }
+
+/* Summary tiles */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { border-radius: 22px; padding: 14px 14px 12px; display: grid; gap: 2px; min-width: 0; border: 0; text-align: left; }
+.tile .label { color: var(--ink); opacity: .75; }
+.tile .big { font-family: var(--f-display); font-weight: 900; font-size: 34px; line-height: 1.05; letter-spacing: -0.02em; }
+.tile .big small { font-size: 16px; font-weight: 800; opacity: .7; margin-left: 2px; }
+.tile .note { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.t-mint { background: var(--mint); } .t-peach { background: var(--peach); } .t-lilac { background: var(--lilac); } .t-sky { background: var(--sky); }
+
+/* Bottom tabs and FAB */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--surface); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+.tab { position: relative; border: 0; background: none; padding: 6px 0 4px; display: grid; justify-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.tab svg { width: 24px; height: 24px; }
+.tab.on { color: var(--accent); }
+.fab { position: fixed; z-index: 26; right: max(18px, calc(env(safe-area-inset-right, 0px) + 18px)); bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); font-size: 32px; font-weight: 400; line-height: 1;
+  box-shadow: 0 8px 22px rgb(150 60 20 / .32); display: grid; place-items: center; }
+
+/* Generic */
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 11px 16px; font-weight: 800; font-size: 14px; }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.danger { color: var(--bad); }
+.btn.warn { background: var(--warn); border-color: var(--warn); color: var(--surface); }
+.btn.sm { padding: 7px 13px; font-size: 13px; }
+.btn.grow { flex: 1; }
+.btn:disabled { opacity: .5; cursor: default; }
+.card { background: var(--surface); border-radius: 22px; padding: 16px; }
+.section-h { font-family: var(--f-display); font-size: 19px; font-weight: 900; margin: 0 0 8px; letter-spacing: -0.01em; }
+.label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.muted { color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.chip.spec { background: var(--spec-soft); color: var(--spec); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.acc { background: var(--peach); color: var(--accent); }
+.banner { border-radius: 18px; padding: 12px 14px; font-size: 14px; display: grid; gap: 6px; }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.seg { display: inline-grid; grid-auto-flow: column; background: var(--surface); border-radius: 999px; padding: 4px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 7px 13px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.seg button.on { background: var(--navy); color: var(--on-navy); }
+
+/* Follow-up banner (peach card) */
+.remind { background: var(--peach); border-radius: 24px; padding: 16px; display: grid; gap: 10px; }
+.remind h2 { font-family: var(--f-display); font-weight: 900; font-size: 19px; margin: 0; }
+.remind .fu { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--surface); border-radius: 16px; padding: 10px 12px; }
+.remind .fu .nm { font-weight: 800; }
+.remind .fu .sub { font-size: 12.5px; color: var(--muted); }
+
+/* Day grid */
+.daybar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.daybar h2 { margin: 0; }
+.gridwrap { background: var(--surface); border-radius: 22px; overflow: hidden; }
+.chairhead { display: grid; grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.chairhead > * { padding: 12px 8px 10px; font-weight: 900; font-size: 14px; min-width: 0; border: 0; background: none; text-align: left; }
+.chairhead small { display: block; font-weight: 600; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid { display: grid; grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr)); position: relative; }
+.tcol { position: relative; }
+.tcol span { position: absolute; left: 0; right: 5px; text-align: right; font-size: 11px; font-weight: 700; color: var(--muted); transform: translateY(5px); }
+.ccol { position: relative; border-left: 1px solid var(--line);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) - 1px), var(--line) calc(var(--row) - 1px) var(--row)); }
+.after-hours { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(135deg, transparent 0 7px, var(--warn-soft) 7px 14px); pointer-events: none; }
+.free { position: absolute; left: 4px; right: 4px; border: 1.5px dashed transparent; border-radius: 14px; background: none; color: var(--muted); opacity: .6; font-size: 12px; font-weight: 700; text-align: left; padding-left: 9px; }
+.free:hover, .free:focus-visible { border-color: var(--line); opacity: 1; }
+.blk { position: absolute; left: 3px; right: 3px; border-radius: 14px; padding: 6px 9px; text-align: left; border: 0;
+  background: var(--sky); color: var(--ink); overflow: hidden; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.blk > span { flex-shrink: 0; }
+.blk.spec { background: var(--lilac); }
+.blk.arrived { background: var(--mint); }
+.blk.in_treatment { background: var(--peach); box-shadow: inset 0 0 0 2px var(--accent); }
+.blk.done { background: var(--sunk); color: var(--muted); }
+.blk.no_show { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line); color: var(--muted); }
+.blk .nm { font-weight: 800; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk .sub { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk .tags { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+.blk .chip { background: var(--surface); }
+.blk .chip.bad { background: var(--bad-soft); } .blk .chip.warn { background: var(--surface); color: var(--warn); }
+.blk.no_show .nm { text-decoration: line-through; }
+.nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
+.nowline::before { content: ""; position: absolute; left: 36px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
+
+/* Queue timeline */
+.qhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.qhead h2 { font-family: var(--f-display); font-size: 21px; font-weight: 900; margin: 0; }
+.tl { display: grid; gap: 10px; position: relative; }
+.qrow { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: center; position: relative; }
+.qrow::before { content: ""; position: absolute; left: 12px; top: 50%; bottom: -60%; border-left: 2px dotted var(--line); }
+.qrow:last-child::before { display: none; }
+.dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); z-index: 1; display: grid; place-items: center; color: var(--on-accent); font-size: 13px; font-weight: 900; }
+.dot.done { background: var(--accent); border-color: var(--accent); }
+.dot.now { border-color: var(--accent); box-shadow: 0 0 0 4px var(--peach); }
+.dot.wait { border-color: var(--ok); }
+.dot.miss { border-color: var(--bad); border-style: dashed; }
+.qcard { background: var(--surface); border-radius: 18px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.qcard.now { box-shadow: inset 0 0 0 2px var(--accent); }
+.qmain { min-width: 0; display: grid; gap: 2px; }
+.qmain .nm { font-weight: 800; font-size: 15.5px; background: none; border: 0; padding: 0; text-align: left; }
+.qmain .sub { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.qside { display: grid; justify-items: end; gap: 6px; padding-left: 10px; border-left: 1px solid var(--line); }
+.qtime { font-weight: 900; font-size: 15px; text-align: right; }
+.qtime s { display: block; color: var(--muted); font-size: 11px; font-weight: 600; }
+.timer { font-size: 12px; color: var(--muted); font-weight: 700; }
+.timer.over { color: var(--bad); }
+.qdone { font-size: 13px; color: var(--muted); font-weight: 700; padding-left: 34px; }
+
+/* History */
+.hrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.hrow:first-of-type { border-top: 0; }
+.hrow .lbl { font-weight: 700; }
+.hrow.undone .lbl { text-decoration: line-through; color: var(--muted); }
+
+/* Sheet */
+.sheet { position: fixed; inset: 0; z-index: 50; background: rgb(20 16 10 / .42); display: flex; align-items: flex-end; justify-content: center; }
+.panel { background: var(--bg); width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; border-radius: 28px 28px 0 0;
+  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 14px; animation: rise .2s ease-out; }
+@keyframes rise { from { transform: translateY(28px); opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+.panel-h { display: flex; align-items: start; gap: 10px; }
+.panel-h h3 { font-family: var(--f-display); font-size: 23px; font-weight: 900; margin: 0; flex: 1; text-wrap: balance; letter-spacing: -0.01em; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 11px 12px; font-size: 16px; font-weight: 600; min-width: 0; }
+.field textarea { min-height: 80px; resize: vertical; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.quick button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+.quick button.on { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.err { color: var(--bad); font-size: 14px; font-weight: 700; }
+.hint { font-size: 13px; color: var(--muted); }
+.kv { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px 10px; font-size: 14px; background: var(--surface); border-radius: 18px; padding: 14px; margin: 0; }
+.kv dt { color: var(--muted); font-weight: 700; }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.change { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.change.ot { color: var(--bad); }
+.visit { border-top: 1px solid var(--line); padding-top: 8px; font-size: 13.5px; display: grid; gap: 2px; }
+.choose { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choose button { border: 0; border-radius: 22px; padding: 18px 14px; text-align: left; display: grid; gap: 4px; color: var(--ink); }
+.choose b { font-family: var(--f-display); font-size: 19px; font-weight: 900; }
+.choose span { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  background: var(--ink); color: var(--bg); border-radius: 18px; padding: 10px 12px 10px 16px; display: flex; gap: 12px; align-items: center;
+  font-size: 14px; font-weight: 600; max-width: calc(100% - 32px); box-shadow: 0 8px 26px rgb(0 0 0 / .22); }
+.toast button { background: none; border: 0; color: var(--accent); font-weight: 900; padding: 4px; }
+.toast.err { background: var(--bad); color: #fff; }
+
+.login { max-width: 380px; margin: 12vh auto 0; display: grid; gap: 14px; }
+.login h1 { font-family: var(--f-display); font-size: 34px; font-weight: 900; color: var(--accent); margin: 0; }
+.empty { text-align: center; padding: 22px 8px; color: var(--muted); font-weight: 600; }
+
+/* v3 additions */
+.monthbtn { border: 0; background: none; padding: 4px 0; font-weight: 900; font-size: 15px; flex: 1; text-align: left; }
+.monthbtn span { color: var(--muted); font-size: 12px; }
+.badge { position: absolute; top: 2px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff;
+  font-style: normal; font-size: 11px; font-weight: 900; display: grid; place-items: center; }
+.attn { display: grid; gap: 4px; padding-bottom: 8px; }
+.attn-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 0; background: none; padding: 9px 0; text-align: left; border-top: 1px solid var(--line); }
+.attn-row:first-of-type { border-top: 0; }
+.attn-row .chip { min-width: 30px; justify-content: center; font-size: 13px; }
+.attn-t { display: grid; min-width: 0; } .attn-t small { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.resv { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(135deg, var(--spec-soft) 0 8px, transparent 8px 16px); border-block: 2px solid var(--spec); opacity: .9; pointer-events: none; }
+.resv span { position: absolute; right: 6px; top: 3px; font-size: 10.5px; font-weight: 800; color: var(--spec); background: var(--surface); padding: 1px 6px; border-radius: 999px; }
+.free.inres { color: var(--spec); opacity: .8; }
+.resbtn { font-size: 10px; font-weight: 800; color: var(--spec); background: var(--spec-soft); padding: 2px 7px; border-radius: 999px; margin-left: 4px; vertical-align: 1px; letter-spacing: .04em; }
+.legend i.rs { background: repeating-linear-gradient(135deg, var(--spec) 0 2px, var(--spec-soft) 2px 5px); }
+.phone { display: flex; gap: 10px; align-items: center; margin-top: 3px; font-weight: 800; font-size: 14px; }
+.phone a { color: var(--blue); text-decoration: none; }
+.linkbtn { border: 0; background: none; padding: 0 2px; color: var(--accent); font-weight: 800; font-size: 13px; }
+.linkbtn.big { font-family: var(--f-display); font-size: 23px; font-weight: 900; color: var(--ink); text-align: left; padding: 0; }
+.bad-t { color: var(--bad); }
+.card.soft { background: var(--surface); padding: 12px 14px; border-radius: 18px; }
+.panel .card.soft { box-shadow: inset 0 0 0 1px var(--line); }
+.srow { font-size: 14px; font-weight: 700; padding: 4px 0; }
+.search input { font-size: 17px; }
+.plist { padding: 4px 12px; }
+.prow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; border: 0; background: none; text-align: left; padding: 10px 0; border-top: 1px solid var(--line); }
+.prow:first-child { border-top: 0; }
+.pav { width: 40px; height: 40px; border-radius: 50%; background: var(--sky); color: var(--blue); display: grid; place-items: center; font-weight: 900; }
+.pmain { display: grid; min-width: 0; } .pmain b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .pmain small, .pside small { color: var(--muted); font-weight: 600; }
+.filters { display: grid; gap: 10px; }
+.filters .seg { justify-self: start; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .gridl { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 10px; font-weight: 700; font-family: var(--f-body); }
+.chart .bar { fill: var(--accent); }
+.hb { display: grid; gap: 12px; }
+.hb-row { display: grid; grid-template-columns: minmax(80px, 34%) minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.hb-l { font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-track { height: 12px; background: var(--sunk); border-radius: 999px; overflow: hidden; }
+.hb-track i { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.hb-v { font-weight: 900; font-size: 14px; min-width: 2.5em; text-align: right; }
+.hb-s { grid-column: 2 / 4; color: var(--muted); font-weight: 600; font-size: 12px; margin-top: -2px; }
+.tip { position: fixed; z-index: 70; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight: 700; padding: 6px 10px; border-radius: 10px; pointer-events: none; max-width: 70vw; }
+.minisel { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 8px; font-size: 13px; font-weight: 700; max-width: 9.5em; }
+.vbtn { width: 100%; border: 0; background: none; text-align: left; padding: 9px 0; color: inherit; }
+.days { display: grid; gap: 8px; }
+.dayopt { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 16px; padding: 10px 12px; }
+.dayopt small { grid-column: 1 / -1; color: var(--muted); font-weight: 600; }
+.mgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+.mgrid > small { color: var(--muted); font-weight: 800; font-size: 11px; }
+.mday { position: relative; aspect-ratio: 1; max-width: 100%; border: 0; border-radius: 14px; background: var(--surface); display: grid; place-items: center; font-weight: 800; overflow: hidden; }
+.mday .lb { position: absolute; left: 0; bottom: 0; height: 4px; width: var(--load); background: var(--accent); }
+.mday .sp { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--spec); }
+.mday.today { box-shadow: inset 0 0 0 2px var(--accent); }
+.mday.sel { background: var(--ink); color: var(--bg); }
+
+</style>
+
+</head><body>
+<div id="app"></div>
+<div id="sheet" class="sheet" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<div id="tip" class="tip" hidden></div>
+
+<script>
+/* ===== Settings you edit before going live =====
+   Paste your Supabase project URL and anon key here. Leave empty to run the demo. */
+const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0bHhhbXN1cGxybnN6ZGhpaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwOTc4NTAsImV4cCI6MjEwNzY3Mzg1MH0.W8kb9cw8xqWIrLCM2ZH7yVJvzDi_si0DE_DFhpWn7Zg" };
+</script>
+<script>
+/* Chair Book — scheduling logic. Pure functions, no DOM. Times are minutes from midnight.
+   `blocks` are specialist reservations: { id, date, chair, doctor_id, start_min, end_min }. */
+(function (root) {
+  const SLOT = 30;          // slot length in minutes
+  const OPEN = 10 * 60;     // 10:00
+  const CLOSE = 21 * 60;    // 21:00
+  const NO_SHOW_AFTER = 15; // minutes
+  const MOVABLE = ['booked', 'arrived'];
+
+  function toHM(m) {
+    m = Math.round(m);
+    const h = Math.floor(m / 60), mm = m % 60;
+    const h12 = ((h + 11) % 12) + 1;
+    return h12 + ':' + String(mm).padStart(2, '0') + (h < 12 ? ' AM' : ' PM');
+  }
+  function ceilTo(m, step) { return Math.ceil(m / step) * step; }
+  function end(a) { return a.start_min + a.duration_min; }
+  function isActive(a) { return a.status !== 'cancelled' && a.status !== 'no_show'; }
+  function overlaps(a, b) { return a.start_min < end(b) && b.start_min < end(a); }
+  function addDays(s, n) { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+  /** Occupied window of an appointment. In-chair uses the real start; done uses the real end. */
+  function busyWin(a) {
+    if (a.status === 'in_treatment' && a.started_min != null) return { s: a.started_min, e: a.started_min + a.duration_min };
+    if (a.status === 'done') return { s: a.started_min ?? a.start_min, e: a.ended_min ?? end(a) };
+    return { s: a.start_min, e: end(a) };
+  }
+
+  function sameDay(appts, date, exceptIds) {
+    const ex = new Set(exceptIds || []);
+    return appts.filter(a => a.date === date && isActive(a) && !ex.has(a.id));
+  }
+  function inChair(appts, date, chair, exceptIds) { return sameDay(appts, date, exceptIds).filter(a => a.chair === chair); }
+
+  /** Chair conflicts: active appointments in the same chair that overlap. */
+  function chairConflicts(appts, cand) { return inChair(appts, cand.date, cand.chair, [cand.id]).filter(a => overlaps(a, cand)); }
+  /** Doctor conflicts: the same doctor in any chair at an overlapping time. */
+  function doctorConflicts(appts, cand) {
+    if (!cand.doctor_id) return [];
+    return sameDay(appts, cand.date, [cand.id]).filter(a => a.doctor_id === cand.doctor_id && overlaps(a, cand));
+  }
+  /** Back-compatible: chair conflicts only. */
+  function conflicts(appts, cand) { return chairConflicts(appts, cand); }
+  /** Reservation of another doctor that covers this candidate. */
+  function reservedFor(blocks, cand) {
+    return (blocks || []).find(b => b.date === cand.date && b.chair === cand.chair && b.doctor_id !== cand.doctor_id &&
+      cand.start_min < b.end_min && b.start_min < end(cand)) || null;
+  }
+  /** One answer for "can this go here?" */
+  function check(appts, blocks, cand) {
+    return { chair: chairConflicts(appts, cand), doctor: doctorConflicts(appts, cand), reserved: reservedFor(blocks, cand),
+      overtime: end(cand) > CLOSE };
+  }
+  function isFree(appts, blocks, cand, allowReserved) {
+    const c = check(appts, blocks, cand);
+    return !c.chair.length && !c.doctor.length && (allowReserved || !c.reserved);
+  }
+
+  /** First free start at or after `from` that ends by CLOSE. Checks chair, doctor and reservations. */
+  function firstGap(appts, date, chair, dur, from, exceptIds, doctorId, blocks) {
+    const ex = new Set(exceptIds || []);
+    const pool = appts.filter(a => !ex.has(a.id));
+    for (let s = Math.max(OPEN, ceilTo(from, SLOT)); s + dur <= CLOSE; s += SLOT) {
+      if (isFree(pool, blocks, { id: '__gap', date, chair, start_min: s, duration_min: dur, doctor_id: doctorId })) return s;
+    }
+    return null;
+  }
+
+  /** Start time after the last active appointment of the chair and of the doctor (may pass CLOSE). */
+  function endOfQueue(appts, date, chair, from, exceptIds, doctorId) {
+    let t = Math.max(OPEN, ceilTo(from, 5));
+    sameDay(appts, date, exceptIds).forEach(b => { if (b.chair === chair || (doctorId && b.doctor_id === doctorId)) t = Math.max(t, busyWin(b).e); });
+    return t;
+  }
+
+  /** Walk-in: first free gap in the given chairs; else the end of the shortest queue. */
+  function placeWalkIn(appts, date, dur, from, chairs, doctorId, blocks) {
+    chairs = chairs || [1, 2];
+    let best = null;
+    chairs.forEach(ch => {
+      const s = firstGap(appts, date, ch, dur, from, [], doctorId, blocks);
+      if (s !== null && (!best || s < best.start)) best = { chair: ch, start: s, gap: true };
+    });
+    if (best) return Object.assign(best, { overtime: false });
+    chairs.forEach(ch => {
+      const s = endOfQueue(appts, date, ch, from, [], doctorId);
+      if (!best || s < best.start) best = { chair: ch, start: s, gap: false };
+    });
+    best.overtime = best.start + dur > CLOSE;
+    return best;
+  }
+
+  /**
+   * Reflow a whole day so no chair and no doctor is double booked.
+   * `desired` maps id -> wanted start (these go first on a tie). `patch` maps id -> field changes to apply first.
+   * Only booked/arrived appointments move, and never earlier than wanted.
+   * Returns changes [{ id, after: { start_min }, overtime }] for appointments whose start changed.
+   */
+  function reflowDay(appts, date, desired, patch) {
+    desired = desired || {}; patch = patch || {};
+    const day = sameDay(appts, date).map(a => Object.assign({}, a, patch[a.id] || {}));
+    const fixed = [], movable = [];
+    day.forEach(a => (MOVABLE.includes(a.status) ? movable : fixed).push(a));
+    const placed = fixed.map(a => { const w = busyWin(a); return { chair: a.chair, doc: a.doctor_id, s: w.s, e: w.e }; });
+    movable.forEach(a => { a._want = desired[a.id] !== undefined ? desired[a.id] : a.start_min; a._pri = desired[a.id] !== undefined ? 0 : 1; });
+    movable.sort((x, y) => x._want - y._want || x._pri - y._pri);
+    const out = [];
+    const hit = (p, a, s) => s < p.e && p.s < s + a.duration_min;
+    movable.forEach((a, i) => {
+      let s = a._want;
+      const chairHit = () => placed.find(p => p.chair === a.chair && hit(p, a, s));
+      // An appointment that stays where it is keeps any overlap staff chose on purpose.
+      if (a._pri === 1 && !chairHit()) {
+        placed.push({ chair: a.chair, doc: a.doctor_id, s, e: s + a.duration_min });
+        return;
+      }
+      // A moved appointment avoids its chair and its doctor, including later bookings of that doctor.
+      const later = movable.slice(i + 1).filter(b => b.doctor_id === a.doctor_id).map(b => ({ chair: b.chair, doc: b.doctor_id, s: b._want, e: b._want + b.duration_min }));
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const p of placed.concat(later)) {
+          if ((p.chair === a.chair || p.doc === a.doctor_id) && hit(p, a, s)) { s = p.e; moved = true; }
+        }
+      }
+      placed.push({ chair: a.chair, doc: a.doctor_id, s, e: s + a.duration_min });
+      const orig = appts.find(x => x.id === a.id);
+      if (s !== orig.start_min) out.push({ id: a.id, after: { start_min: s }, overtime: s + a.duration_min > CLOSE });
+    });
+    return out;
+  }
+
+  /** Doctor is late by `delay` minutes: shift his not-started appointments, then reflow the day. */
+  function shiftDoctor(appts, date, doctorId, delay, now) {
+    const desired = {};
+    appts.filter(a => a.date === date && a.doctor_id === doctorId && MOVABLE.includes(a.status) && end(a) > now)
+      .forEach(a => { desired[a.id] = a.start_min + delay; });
+    return reflowDay(appts, date, desired);
+  }
+  /** Treatment ended at `endedMin`: reflow with the real end. */
+  function afterTreatmentEnd(appts, appt, endedMin) {
+    const st = appt.started_min ?? appt.start_min;
+    return reflowDay(appts, appt.date, {}, { [appt.id]: { status: 'done', ended_min: endedMin, start_min: st, duration_min: Math.max(5, endedMin - st) } });
+  }
+  /** Treatment starts now with an estimated length: reflow with the new window. */
+  function afterStart(appts, appt, startedMin, estimate) {
+    return reflowDay(appts, appt.date, {}, { [appt.id]: { status: 'in_treatment', started_min: startedMin, start_min: startedMin, duration_min: estimate } });
+  }
+  /** Treatment needs more time: reflow with the longer window. */
+  function afterExtend(appts, appt, extra) {
+    return reflowDay(appts, appt.date, {}, { [appt.id]: { duration_min: appt.duration_min + extra } });
+  }
+
+  /** Place one appointment on another day: same time if free, else a gap in the same chair, else the other chair, else the end. */
+  function placeOnDay(work, blocks, a, toDate, fromMin) {
+    const want = fromMin ?? a.start_min;
+    const cand = Object.assign({}, a, { date: toDate, start_min: want });
+    if (isFree(work, blocks, cand) && end(cand) <= CLOSE) return { chair: a.chair, start: want };
+    let s = firstGap(work, toDate, a.chair, a.duration_min, want, [a.id], a.doctor_id, blocks);
+    if (s !== null) return { chair: a.chair, start: s };
+    const other = a.chair === 1 ? 2 : 1;
+    s = firstGap(work, toDate, other, a.duration_min, want, [a.id], a.doctor_id, blocks);
+    if (s !== null) return { chair: other, start: s };
+    return { chair: a.chair, start: endOfQueue(work, toDate, a.chair, want, [a.id], a.doctor_id) };
+  }
+
+  /** Move a doctor's not-started appointments of one day to another day. Blocks move with the doctor. */
+  function moveDoctorDay(appts, fromDate, doctorId, toDate, blocks) {
+    const movedBlocks = (blocks || []).map(b => b.doctor_id === doctorId && b.date === fromDate ? Object.assign({}, b, { date: toDate }) : b);
+    const mine = appts.filter(a => a.date === fromDate && a.doctor_id === doctorId && MOVABLE.includes(a.status))
+      .sort((x, y) => x.start_min - y.start_min);
+    let work = appts.slice();
+    const changes = [];
+    mine.forEach(a => {
+      const p = placeOnDay(work, movedBlocks, a, toDate);
+      const after = { date: toDate, chair: p.chair, start_min: p.start, status: 'booked' };
+      changes.push({ id: a.id, after, overtime: p.start + a.duration_min > CLOSE });
+      work = work.map(w => w.id === a.id ? Object.assign({}, w, after) : w);
+    });
+    return changes;
+  }
+
+  /** Score the next `days` days for a doctor's move: how many fit inside hours, and how many go late. */
+  function findDays(appts, fromDate, doctorId, days, blocks) {
+    const out = [];
+    for (let i = 1; i <= days; i++) {
+      const d = addDays(fromDate, i);
+      const ch = moveDoctorDay(appts, fromDate, doctorId, d, blocks);
+      const late = ch.filter(c => c.overtime).length;
+      const shifted = ch.filter(c => {
+        const a = appts.find(x => x.id === c.id);
+        return c.after.start_min !== a.start_min || c.after.chair !== a.chair;
+      }).length;
+      out.push({ date: d, total: ch.length, late, shifted, load: dayLoad(appts, d) });
+    }
+    return out;
+  }
+
+  /** Series booking: the next visits after the first. Each keeps the time if free, else the nearest gap that day. */
+  function planSeries(appts, blocks, first, everyDays, count) {
+    const out = [];
+    let work = appts.concat([first]);
+    for (let k = 1; k < count; k++) {
+      const d = addDays(first.date, everyDays * k);
+      const tmp = Object.assign({}, first, { id: '__series' + k, date: d });
+      const p = placeOnDay(work, blocks, tmp, d, first.start_min);
+      const row = Object.assign({}, tmp, { chair: p.chair, start_min: p.start });
+      out.push({ date: d, chair: p.chair, start_min: p.start, sameTime: p.start === first.start_min && p.chair === first.chair, overtime: end(row) > CLOSE });
+      work = work.concat([row]);
+    }
+    return out;
+  }
+
+  /** Live queue for one chair: projected start and delay per appointment. */
+  function project(appts, date, chair, now) {
+    const list = inChair(appts, date, chair).slice().sort((x, y) => x.start_min - y.start_min);
+    let cursor = 0;
+    return list.map(a => {
+      let pStart, pEnd;
+      if (a.status === 'done') { const w = busyWin(a); pStart = w.s; pEnd = w.e; }
+      else if (a.status === 'in_treatment') { pStart = a.started_min ?? a.start_min; pEnd = Math.max(pStart + a.duration_min, now); }
+      else { pStart = Math.max(a.start_min, cursor); pEnd = pStart + a.duration_min; }
+      cursor = Math.max(cursor, pEnd);
+      return { appt: a, pStart, pEnd, delay: Math.max(0, pStart - a.start_min) };
+    });
+  }
+
+  function noShowDue(a, now, today) { return a.status === 'booked' && a.date === today && now >= a.start_min + NO_SHOW_AFTER; }
+
+  /** Slot grid rows from OPEN until CLOSE or the last appointment. */
+  function slotRows(appts, date) {
+    let last = CLOSE;
+    appts.forEach(a => { if (a.date === date && isActive(a)) last = Math.max(last, end(a)); });
+    const rows = [];
+    for (let s = OPEN; s < ceilTo(last, SLOT); s += SLOT) rows.push(s);
+    return rows;
+  }
+
+  /** Free and booked slot counts for one day, both chairs. */
+  function dayLoad(appts, date) {
+    let booked = 0;
+    const total = ((CLOSE - OPEN) / SLOT) * 2;
+    [1, 2].forEach(ch => {
+      const busy = inChair(appts, date, ch);
+      for (let s = OPEN; s < CLOSE; s += SLOT) if (busy.some(b => overlaps(b, { start_min: s, duration_min: SLOT }))) booked++;
+    });
+    return { booked, free: total - booked, total };
+  }
+
+  const api = { SLOT, OPEN, CLOSE, NO_SHOW_AFTER, MOVABLE, toHM, ceilTo, end, addDays, isActive, overlaps, busyWin,
+    conflicts, chairConflicts, doctorConflicts, reservedFor, check, isFree, firstGap, endOfQueue, placeWalkIn,
+    reflowDay, shiftDoctor, afterTreatmentEnd, afterStart, afterExtend, placeOnDay, moveDoctorDay, findDays, planSeries,
+    project, noShowDue, slotRows, dayLoad };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Sched = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(() => {
+/* ===== Core: state, helpers, transactions, sync, demo data ===== */
+const S = window.Sched;
+const LIVE = !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+const STORE_KEY = 'chairbook-demo-v2';
+const OUTBOX_KEY = 'chairbook-outbox';
+const ROW = 60; // pixels per 30-minute slot
+const STATUS = { booked: 'Booked', arrived: 'Waiting', in_treatment: 'In chair', done: 'Done', no_show: 'No-show', cancelled: 'Cancelled' };
+const TREATMENTS = ['Consultation', 'Scaling', 'Filling', 'RCT', 'Extraction', 'Crown prep', 'Crown fit', 'Ortho review', 'Implant', 'X-ray'];
+const TABLE = { appointments: 'appts', patients: 'patients', doctors: 'doctors', blocks: 'blocks' };
+const ROLE_NAME = { admin: 'Admin', receptionist: 'Receptionist', assistant: 'Assistant' };
+
+const DB = { doctors: [], patients: [], appts: [], blocks: [], log: [], staff: [], requests: [] };
+const UI = { tab: 'day', date: null, chairs: 0, role: 'receptionist', user: 'Receptionist', userId: null, online: true, pending: 0,
+  autoScroll: true, pq: '', ins: { range: 30, doc: '', chair: 0, treat: '' }, histAll: false };
+let demoClock = { min: 11 * 60 + 20, realAt: Date.now(), real: false };
+let sb = null;
+
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2));
+const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const addDays = S.addDays;
+const fmtDate = (s, o) => new Date(s + 'T00:00:00').toLocaleDateString('en-IN', o || { weekday: 'short', day: 'numeric', month: 'short' });
+const digits = s => String(s || '').replace(/\D/g, '').slice(-10);
+const hm = S.toHM;
+const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
+function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+
+function today() { return ymd(new Date()); }
+function nowMin() {
+  if (!LIVE && !demoClock.real) return Math.min(demoClock.min + (Date.now() - demoClock.realAt) / 60000, 24 * 60 - 1);
+  const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+}
+const doctor = id => DB.doctors.find(d => d.id === id) || { name: 'Unknown doctor' };
+const patient = id => DB.patients.find(p => p.id === id) || { name: 'Unknown patient', phone: '' };
+const appt = id => DB.appts.find(a => a.id === id);
+const isAdmin = () => UI.role === 'admin';
+const activeDoctors = () => DB.doctors.filter(d => d.active !== false);
+
+function newAppt(row) {
+  return Object.assign({ id: uid(), chair: 1, duration_min: 30, status: 'booked', kind: 'appointment', reason: '', late: false, arrived_min: null, started_min: null, ended_min: null,
+    sched_min: null, booked_min: null, treatment_done: '', plan: '', next_followup: null, note_doctor_id: null, followup_dismissed: false,
+    moved_from_date: null, moved_from_min: null, informed: false, informed_delay: 0, series_id: null }, row);
+}
+/** Fields to save when the site moves an appointment, so it shows on the call list. */
+function moveFields(a, after) {
+  const changed = (after.start_min !== undefined && after.start_min !== a.start_min) || (after.date && after.date !== a.date) || (after.chair && after.chair !== a.chair);
+  if (!changed) return after;
+  return Object.assign({}, after, { moved_from_date: a.moved_from_date ?? a.date, moved_from_min: a.moved_from_min ?? a.start_min, informed: false });
+}
+
+/* ---------- transactions, commit and undo ---------- */
+function Tx() {
+  const map = new Map();
+  const cur = (table, id) => { const k = table + ':' + id; if (map.has(k)) return map.get(k).after; return DB[TABLE[table]].find(r => r.id === id) || null; };
+  return {
+    update(table, id, patch) {
+      const k = table + ':' + id, c = cur(table, id);
+      const before = map.has(k) ? map.get(k).before : clone(c);
+      map.set(k, { table, id, before, after: Object.assign(clone(c), patch) });
+    },
+    insert(table, row) { map.set(table + ':' + row.id, { table, id: row.id, before: null, after: row }); },
+    remove(table, id) { const k = table + ':' + id; const before = map.has(k) ? map.get(k).before : clone(cur(table, id)); map.set(k, { table, id, before, after: null }); },
+    changes() { return [...map.values()]; }
+  };
+}
+function applyLocal(changes) {
+  changes.forEach(c => {
+    const arr = DB[TABLE[c.table]], i = arr.findIndex(r => r.id === c.id);
+    if (c.after === null) { if (i >= 0) arr.splice(i, 1); }
+    else if (i >= 0) arr[i] = clone(c.after); else arr.push(clone(c.after));
+  });
+}
+
+/* Live saving goes through an outbox, so a change made offline is kept and sent later. */
+let outbox = (store(OUTBOX_KEY) || []);
+let flushing = false;
+async function persist(changes, logRow, undoId) {
+  if (!LIVE) { saveDemo(); return true; }
+  outbox.push({ changes: changes.map(c => ({ table: c.table, id: c.id, after: c.after })), log: logRow || null, undo: undoId || null });
+  store(OUTBOX_KEY, outbox);
+  return flush();
+}
+async function flush() {
+  if (flushing || !sb) return true;
+  flushing = true;
+  let ok = true;
+  while (outbox.length) {
+    const item = outbox[0];
+    const { error } = await sb.rpc('apply_changes', { p_changes: item.changes, p_log: item.log, p_undo: item.undo });
+    if (error) {
+      const network = !navigator.onLine || /fetch|network|timeout|load failed/i.test(error.message || '');
+      if (network) { ok = false; break; }
+      outbox.shift();
+      toast(/exclu|overlap|conflict/i.test(error.message) ? 'Not saved: another phone booked this chair at that time.' : 'Not saved: ' + error.message, null, true);
+      ok = false;
+    } else outbox.shift();
+    store(OUTBOX_KEY, outbox);
+  }
+  flushing = false;
+  UI.pending = outbox.length;
+  renderHeaderOnly();
+  if (!outbox.length && !ok) await loadLive();
+  return ok;
+}
+window.addEventListener('online', () => { if (LIVE) flush().then(() => loadLive()); });
+setInterval(() => { if (LIVE && outbox.length) flush(); }, 20000);
+
+async function commit(label, tx, opts = {}) {
+  const changes = tx.changes();
+  if (!changes.length) return;
+  applyLocal(changes);
+  const entry = { id: uid(), at: new Date().toISOString(), by_name: UI.user, label, changes, undone: false };
+  DB.log.unshift(entry);
+  render();
+  const ok = await persist(changes, entry);
+  if (!opts.quiet) toast(ok || !LIVE ? label : label + ' · saved on this phone, sends when online', entry.id);
+}
+function sameRow(cur, after) {
+  if (after === null) return !cur;
+  return !!cur && Object.keys(after).every(k => JSON.stringify(cur[k] ?? null) === JSON.stringify(after[k] ?? null));
+}
+async function undo(entryId) {
+  const e = DB.log.find(l => l.id === entryId);
+  if (!e || e.undone) return;
+  const blocked = e.changes.find(c => !sameRow(DB[TABLE[c.table]].find(r => r.id === c.id), c.after));
+  if (blocked) { toast('This was changed again later. Undo the later change first.', null, true); return; }
+  const rev = e.changes.map(c => ({ table: c.table, id: c.id, before: c.after, after: c.before }));
+  applyLocal(rev);
+  e.undone = true;
+  render();
+  await persist(rev, null, e.id);
+  toast('Undone: ' + e.label);
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg, undoId, isErr) {
+  const t = $('#toast');
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.innerHTML = '<span>' + esc(msg) + '</span>' + (undoId ? '<button data-act="undo" data-id="' + undoId + '">Undo</button>' : '');
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
+}
+
+/* ---------- demo data ---------- */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function seedDemo() {
+  const T = today(), d = n => addDays(T, n), h = (H, M = 0) => H * 60 + M, R = rng(20261016);
+  const pick = arr => arr[Math.floor(R() * arr.length)];
+  const doctors = [
+    { id: 'doc-own', name: 'Dr. Meera', specialist: false, specialty: 'General dentist', active: true },
+    { id: 'doc-endo', name: 'Dr. Karthik', specialist: true, specialty: 'Endodontist', active: true },
+    { id: 'doc-ortho', name: 'Dr. Farah', specialist: true, specialty: 'Orthodontist', active: true },
+  ];
+  const first = ['Ravi', 'Lakshmi', 'Arun', 'Divya', 'Irfan', 'Priya', 'Senthil', 'Kavya', 'Joseph', 'Anitha', 'Gokul', 'Revathi', 'Suresh', 'Meena', 'Vikram',
+    'Nandhini', 'Bala', 'Fathima', 'Hari', 'Swathi', 'Ajay', 'Keerthana', 'Manoj', 'Pooja', 'Rahul', 'Sangeetha', 'Tarun', 'Usha', 'Vinod', 'Yamini'];
+  const last = ['Kumar', 'R', 'Prakash', 'S', 'Mohammed', 'Nair', 'V', 'M', 'D', 'K', 'B', 'Iyer', 'Rao', 'Reddy', 'Pillai'];
+  const patients = first.map((f, i) => ({ id: 'pt-' + i, name: f + ' ' + last[i % last.length], phone: '9' + String(840012345 + i * 7919).slice(0, 9) }));
+  patients[1].phone = patients[0].phone; // a family on one phone
+  const A = [];
+  const add = o => { const a = newAppt(o); A.push(a); return a; };
+  // 60 days of history for Insights
+  for (let k = 60; k >= 1; k--) {
+    const date = d(-k);
+    if (new Date(date + 'T00:00:00').getDay() === 0) continue;
+    const specDay = k % 6 === 2 ? 'doc-endo' : k % 10 === 5 ? 'doc-ortho' : null;
+    [1, 2].forEach(ch => {
+      let s = h(10) + Math.floor(R() * 4) * 30;
+      while (s < h(20, 30)) {
+        if (R() < 0.35) { s += 30; continue; }
+        const docId = ch === 2 && specDay && s < h(15) ? specDay : 'doc-own';
+        const treat = docId === 'doc-endo' ? pick(['RCT', 'RCT', 'Consultation', 'Crown prep']) : docId === 'doc-ortho' ? 'Ortho review' : pick(['Consultation', 'Scaling', 'Filling', 'Filling', 'Extraction', 'X-ray', 'Crown fit']);
+        const booked = ['RCT', 'Crown prep', 'Implant'].includes(treat) ? 60 : 30;
+        let pt; do { pt = 'pt-' + Math.floor(R() * patients.length); } while (['pt-5', 'pt-6', 'pt-13', 'pt-14', 'pt-15', 'pt-16'].includes(pt));
+        if (R() < 0.08) { add({ patient_id: pt, doctor_id: docId, date, chair: ch, start_min: s, duration_min: booked, status: 'no_show', reason: treat }); s += booked; continue; }
+        const wait = Math.floor(R() * 18), actual = Math.max(10, booked + Math.floor(R() * 26) - 8);
+        add({ patient_id: pt, doctor_id: docId, date, chair: ch, start_min: s + wait, duration_min: actual, sched_min: s, booked_min: booked, status: 'done',
+          kind: R() < 0.15 ? 'walkin' : 'appointment', arrived_min: s - 5, started_min: s + wait, ended_min: s + wait + actual, reason: treat,
+          treatment_done: treat, plan: treat === 'RCT' ? 'Continue RCT next sitting.' : '', note_doctor_id: docId });
+        s = s + wait + actual; s = S.ceilTo(s, 30);
+      }
+    });
+  }
+  // follow-ups: due today, overdue, pending notes
+  add({ patient_id: 'pt-5', doctor_id: 'doc-own', date: d(-14), start_min: h(17), status: 'done', started_min: h(17), ended_min: h(17, 35), duration_min: 35, sched_min: h(17), booked_min: 30,
+    reason: 'Pain lower left', treatment_done: 'Filling', plan: 'Composite on 36. Review sensitivity.', next_followup: T, note_doctor_id: 'doc-own' });
+  add({ patient_id: 'pt-6', doctor_id: 'doc-endo', date: d(-7), chair: 2, start_min: h(12), duration_min: 65, sched_min: h(12), booked_min: 60, status: 'done', started_min: h(12), ended_min: h(13, 5),
+    reason: 'RCT 46', treatment_done: 'RCT', plan: 'Access opening and BMP done. Obturation next.', next_followup: T, note_doctor_id: 'doc-endo' });
+  add({ patient_id: 'pt-13', doctor_id: 'doc-own', date: d(-20), start_min: h(18), duration_min: 30, status: 'done', started_min: h(18), ended_min: h(18, 30), sched_min: h(18), booked_min: 30,
+    reason: 'Filling', treatment_done: 'Filling', plan: 'Recheck 26 for sensitivity.', next_followup: d(-5), note_doctor_id: 'doc-own' });
+  add({ patient_id: 'pt-14', doctor_id: 'doc-endo', date: d(-12), chair: 2, start_min: h(11), duration_min: 60, status: 'done', started_min: h(11), ended_min: h(12), sched_min: h(11), booked_min: 60,
+    reason: 'RCT 16', treatment_done: 'RCT', plan: 'Obturation due.', next_followup: d(-3), note_doctor_id: 'doc-endo' });
+  add({ patient_id: 'pt-15', doctor_id: 'doc-own', date: d(-1), start_min: h(19), duration_min: 30, status: 'done', started_min: h(19), ended_min: h(19, 30), sched_min: h(19), booked_min: 30, reason: 'Scaling' });
+  add({ patient_id: 'pt-16', doctor_id: 'doc-own', date: d(-2), chair: 2, start_min: h(18), duration_min: 30, status: 'done', started_min: h(18), ended_min: h(18, 30), sched_min: h(18), booked_min: 30, reason: 'Extraction' });
+  // today
+  add({ patient_id: 'pt-2', doctor_id: 'doc-own', date: T, start_min: h(10, 2), duration_min: 26, sched_min: h(10), booked_min: 30, status: 'done', arrived_min: h(9, 55), started_min: h(10, 2), ended_min: h(10, 28),
+    reason: 'Review', treatment_done: 'Consultation', plan: 'Gum check fine.', note_doctor_id: 'doc-own' });
+  add({ patient_id: 'pt-3', doctor_id: 'doc-own', date: T, start_min: h(10, 30), reason: 'Sensitivity' });
+  add({ patient_id: 'pt-4', doctor_id: 'doc-own', date: T, start_min: h(11, 2), duration_min: 30, sched_min: h(11), booked_min: 30, status: 'in_treatment', arrived_min: h(10, 50), started_min: h(11, 2), reason: 'Extraction 48' });
+  add({ patient_id: 'pt-7', doctor_id: 'doc-own', date: T, start_min: h(11, 30), status: 'arrived', arrived_min: h(11, 10), reason: 'Filling' });
+  add({ patient_id: 'pt-8', doctor_id: 'doc-own', date: T, start_min: h(12), reason: 'Scaling' });
+  add({ patient_id: 'pt-1', doctor_id: 'doc-own', date: T, start_min: h(17), reason: 'Consultation' });
+  add({ patient_id: 'pt-9', doctor_id: 'doc-own', date: T, start_min: h(19), duration_min: 60, reason: 'Crown prep' });
+  add({ patient_id: 'pt-10', doctor_id: 'doc-endo', chair: 2, date: T, start_min: h(11, 5), duration_min: 60, sched_min: h(11), booked_min: 60, status: 'in_treatment', arrived_min: h(10, 55), started_min: h(11, 5), reason: 'RCT 36' });
+  add({ patient_id: 'pt-11', doctor_id: 'doc-endo', chair: 2, date: T, start_min: h(12, 5), duration_min: 60, status: 'arrived', arrived_min: h(11, 15), reason: 'RCT 26 obturation',
+    moved_from_date: T, moved_from_min: h(12) });
+  add({ patient_id: 'pt-0', doctor_id: 'doc-endo', chair: 2, date: T, start_min: h(13, 5), duration_min: 30, reason: 'Post-RCT review', moved_from_date: T, moved_from_min: h(13) });
+  add({ patient_id: 'pt-2', doctor_id: 'doc-own', chair: 2, date: T, start_min: h(18), reason: 'Scaling' });
+  // coming days
+  add({ patient_id: 'pt-3', doctor_id: 'doc-own', date: d(1), start_min: h(10, 30), reason: 'Filling' });
+  add({ patient_id: 'pt-8', doctor_id: 'doc-own', date: d(1), start_min: h(18), reason: 'Review' });
+  add({ patient_id: 'pt-1', doctor_id: 'doc-ortho', chair: 2, date: d(3), start_min: h(16), reason: 'Braces adjustment' });
+  add({ patient_id: 'pt-7', doctor_id: 'doc-ortho', chair: 2, date: d(3), start_min: h(16, 30), reason: 'Braces adjustment' });
+  add({ patient_id: 'pt-10', doctor_id: 'doc-endo', chair: 2, date: d(4), start_min: h(11), duration_min: 60, reason: 'RCT 36 obturation' });
+  const blocks = [
+    { id: 'blk-1', date: T, chair: 2, doctor_id: 'doc-endo', start_min: h(11), end_min: h(14) },
+    { id: 'blk-2', date: d(3), chair: 2, doctor_id: 'doc-ortho', start_min: h(16), end_min: h(18) },
+    { id: 'blk-3', date: d(4), chair: 2, doctor_id: 'doc-endo', start_min: h(11), end_min: h(13) },
+  ];
+  const staff = [{ user_id: 'u-admin', name: 'Admin', role: 'admin' }, { user_id: 'u-rec', name: 'Receptionist', role: 'receptionist' }, { user_id: 'u-asst', name: 'Assistant', role: 'assistant' }];
+  const requests = [{ user_id: 'u-new', name: 'Nithya', email: 'nithya@example.com' }];
+  return { doctors, patients, appts: A, blocks, log: [], staff, requests };
+}
+function loadDemo(fresh) {
+  const s = fresh ? null : store(STORE_KEY);
+  const data = s && s.seededFor === today() ? s : Object.assign(seedDemo(), { seededFor: today() });
+  ['doctors', 'patients', 'appts', 'blocks', 'staff', 'requests'].forEach(k => { DB[k] = data[k] || []; });
+  DB.log = data.log || [];
+  const c = store(STORE_KEY + '-clock');
+  if (c && !fresh) demoClock = { min: c.min, realAt: Date.now() - (c.elapsed || 0), real: !!c.real };
+  setRole(store(STORE_KEY + '-role') || 'receptionist');
+  saveDemo();
+}
+function saveDemo() {
+  store(STORE_KEY, { seededFor: today(), doctors: DB.doctors, patients: DB.patients, appts: DB.appts, blocks: DB.blocks, staff: DB.staff, requests: DB.requests, log: DB.log.slice(0, 200) });
+  store(STORE_KEY + '-clock', { min: demoClock.min, elapsed: Date.now() - demoClock.realAt, real: demoClock.real });
+}
+function setRole(r) { UI.role = r; UI.user = ROLE_NAME[r] || r; }
+
+/* ---------- live (Supabase) ---------- */
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+async function initLive() {
+  await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js');
+  sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+  const { data } = await sb.auth.getSession();
+  if (!data.session) return renderLogin();
+  await afterLogin();
+}
+async function afterLogin() {
+  const { data: u } = await sb.auth.getUser();
+  const { data: staff } = await sb.from('staff').select('*').eq('user_id', u.user.id).maybeSingle();
+  if (!staff) { await sb.auth.signOut(); return renderLogin('Your account waits for the admin to approve it. Ask the admin to open More > Staff.'); }
+  UI.role = staff.role; UI.user = staff.name; UI.userId = staff.user_id;
+  await loadLive();
+  sb.channel('clinic').on('postgres_changes', { event: '*', schema: 'public' }, () => { clearTimeout(afterLogin.t); afterLogin.t = setTimeout(() => { if (!outbox.length) loadLive(); }, 500); })
+    .subscribe(st => { UI.online = st === 'SUBSCRIBED'; renderHeaderOnly(); });
+  flush();
+}
+async function loadLive() {
+  const from = addDays(today(), -400), to = addDays(today(), 400);
+  const q = [sb.from('doctors').select('*').order('name'), sb.from('patients').select('*'),
+    sb.from('appointments').select('*').gte('date', from).lte('date', to), sb.from('blocks').select('*').gte('date', addDays(today(), -30)),
+    sb.from('change_log').select('*').order('at', { ascending: false }).limit(150)];
+  if (isAdmin()) q.push(sb.from('staff').select('*').order('name'), sb.from('staff_requests').select('*'));
+  const r = await Promise.all(q);
+  const err = r.find(x => x.error);
+  if (err) { UI.online = false; renderHeaderOnly(); toast('Could not load data: ' + err.error.message, null, true); return; }
+  Object.assign(DB, { doctors: r[0].data, patients: r[1].data, appts: r[2].data, blocks: r[3].data, log: r[4].data });
+  if (isAdmin()) { DB.staff = r[5].data; DB.requests = r[6].data; }
+  outbox.forEach(item => applyLocal(item.changes)); // keep unsent changes on screen
+  UI.online = true; UI.pending = outbox.length;
+  render();
+}
+function renderLogin(msg, signup) {
+  $('#app').innerHTML = `<div class="wrap"><form class="login card" id="loginForm">
+    <h1>chairbook</h1><p class="muted">${signup ? 'Ask for a staff account. The admin approves it.' : 'Sign in with your clinic staff account.'}</p>
+    ${signup ? '<label class="field"><span class="label">Your name</span><input id="lgName" required></label>' : ''}
+    <label class="field"><span class="label">Email</span><input id="lgEmail" type="email" autocomplete="username" required></label>
+    <label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required></label>
+    ${msg ? `<div class="${/approve|sent/.test(msg) ? 'hint' : 'err'}">${esc(msg)}</div>` : ''}
+    <button class="btn primary">${signup ? 'Ask for access' : 'Sign in'}</button>
+    <button type="button" class="btn" id="lgSwitch">${signup ? 'I have an account' : 'New staff? Ask for access'}</button></form></div>`;
+  $('#lgSwitch').addEventListener('click', () => renderLogin('', !signup));
+  $('#loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = $('#lgEmail').value.trim(), password = $('#lgPass').value;
+    if (signup) {
+      const { error } = await sb.auth.signUp({ email, password, options: { data: { name: $('#lgName').value.trim() } } });
+      if (error) return renderLogin(error.message, true);
+      await sb.auth.signOut();
+      return renderLogin('Request sent. You can sign in after the admin approves it.');
+    }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return renderLogin('Sign-in failed. Check the email and password.');
+    afterLogin();
+  });
+}
+
+/* ===== Derived data ===== */
+const dayAppts = (date, chair) => DB.appts.filter(a => a.date === date && (!chair || a.chair === chair) && a.status !== 'cancelled');
+const blocksOn = (date, chair) => DB.blocks.filter(b => b.date === date && (!chair || b.chair === chair)).sort((x, y) => x.start_min - y.start_min);
+function chairDoctors(date, chair) {
+  const ids = [...new Set(dayAppts(date, chair).filter(S.isActive).map(a => a.doctor_id).concat(blocksOn(date, chair).map(b => b.doctor_id)))];
+  return ids.map(doctor);
+}
+const hasLaterAppt = a => DB.appts.some(b => b.patient_id === a.patient_id && b.id !== a.id && S.isActive(b) && b.date > a.date);
+const followupsDue = date => DB.appts.filter(a => a.status === 'done' && a.next_followup === date && !a.followup_dismissed && !hasLaterAppt(a));
+const overdueFollowups = () => DB.appts.filter(a => a.status === 'done' && a.next_followup && a.next_followup < today() && !a.followup_dismissed && !hasLaterAppt(a))
+  .sort((x, y) => x.next_followup.localeCompare(y.next_followup));
+const notesPending = () => DB.appts.filter(a => a.status === 'done' && !a.note_doctor_id && a.date >= addDays(today(), -14)).sort((x, y) => y.date.localeCompare(x.date));
+const overtimeOn = date => DB.appts.filter(a => a.date === date && S.isActive(a) && a.status !== 'done' && S.end(a) > S.CLOSE);
+const lateNow = () => DB.appts.filter(a => S.noShowDue(a, nowMin(), today()));
+function delayMap(date) {
+  const m = {};
+  if (date !== today()) return m;
+  [1, 2].forEach(ch => S.project(DB.appts, date, ch, nowMin()).forEach(p => { m[p.appt.id] = p; }));
+  return m;
+}
+/** Patients to tell: moved by the site and not told yet, or running 15+ minutes late today. */
+function callList() {
+  const T = today(), out = [], seen = new Set();
+  DB.appts.filter(a => a.date >= T && ['booked', 'arrived'].includes(a.status) && a.moved_from_min != null && !a.informed)
+    .forEach(a => { seen.add(a.id); out.push({ a, kind: 'moved' }); });
+  const dm = delayMap(T);
+  Object.values(dm).forEach(p => {
+    const a = p.appt;
+    if (seen.has(a.id) || !['booked', 'arrived'].includes(a.status)) return;
+    if (p.delay >= 15 && p.delay - (a.informed_delay || 0) >= 10) out.push({ a, kind: 'late', delay: Math.round(p.delay), pStart: p.pStart });
+  });
+  return out.sort((x, y) => (x.a.date + pad(x.a.start_min)).localeCompare(y.a.date + pad(y.a.start_min)));
+}
+function defaultDoctor(date, chair, start) {
+  const b = blocksOn(date, chair).find(x => start != null && start >= x.start_min && start < x.end_min);
+  if (b) return b.doctor_id;
+  const counts = {};
+  dayAppts(date, chair).filter(S.isActive).forEach(a => { counts[a.doctor_id] = (counts[a.doctor_id] || 0) + 1; });
+  const top = Object.keys(counts).sort((x, y) => counts[y] - counts[x])[0];
+  return top || (activeDoctors().find(d => !d.specialist) || activeDoctors()[0] || {}).id;
+}
+
+/* ===== Render ===== */
+function render() {
+  if (!UI.date) UI.date = today();
+  const scroll = window.scrollY;
+  const views = { day: dayHTML, queue: queueHTML, patients: patientsHTML, insights: insightsHTML, more: moreHTML };
+  $('#app').innerHTML = headerHTML() + `<main class="wrap">${views[UI.tab]()}</main>` + tabsHTML();
+  if (UI.autoScroll) {
+    UI.autoScroll = false;
+    const nl = $('.nowline');
+    window.scrollTo(0, UI.tab === 'day' && nl ? Math.max(0, nl.getBoundingClientRect().top + window.scrollY - 260) : 0);
+  } else window.scrollTo(0, scroll);
+}
+function renderHeaderOnly() { const h = $('.top'); if (h) h.outerHTML = headerHTML(); }
+
+const MARK = `<svg class="mark" viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="7" width="13" height="18" rx="6.5" fill="var(--blue)"/><rect x="13" y="3" width="13" height="18" rx="6.5" fill="var(--spec)"/><circle cx="14" cy="14" r="4" fill="var(--accent)"/></svg>`;
+const ICONS = {
+  day: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/></svg>',
+  queue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="5" cy="5" r="2.4"/><circle cx="5" cy="12" r="2.4"/><circle cx="5" cy="19" r="2.4"/><path d="M11 5h9M11 12h9M11 19h6"/></svg>',
+  patients: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>',
+  insights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V13M10 20V6M16 20v-9M22 20H2"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg>'
+};
+function greeting() { const m = nowMin(); return m < 12 * 60 ? 'Good morning' : m < 17 * 60 ? 'Good afternoon' : 'Good evening'; }
+
+function headerHTML() {
+  const T = today(), d = UI.date;
+  const start = addDays(d, -((new Date(d + 'T00:00:00').getDay() + 6) % 7));
+  let week = '';
+  for (let i = 0; i < 7; i++) {
+    const x = addDays(start, i), load = S.dayLoad(DB.appts, x), r = load.booked / load.total;
+    week += `<button class="wd ${x === d ? 'sel' : ''} ${x === T ? 'today' : ''}" data-act="date" data-d="${x}" aria-label="${fmtDate(x, { weekday: 'long', day: 'numeric', month: 'long' })}, ${load.booked} of ${load.total} slots booked">
+      <small>${fmtDate(x, { weekday: 'short' })}</small><b>${+x.slice(8)}<i class="${r >= .85 ? 'full' : r > 0 ? 'busy' : ''}"></i></b></button>`;
+  }
+  const status = UI.pending ? `<span class="chip warn">Offline · ${UI.pending} waiting</span>` : '';
+  return `<header class="top"><div class="wrap">
+    <div class="top-row"><div class="brand">${MARK}chairbook${LIVE ? '' : '<span class="mode">Demo</span>'}</div>${status}
+      <div class="avatar"><span>${esc(UI.user)}<br><span class="mono">${hm(nowMin())}</span></span><b class="${UI.online && !UI.pending ? '' : 'off'}">${esc((UI.user || '?')[0])}</b></div></div>
+    <div class="monthbar"><button class="monthbtn" data-act="month">${fmtDate(d, { month: 'long', year: 'numeric' })} <span aria-hidden="true">▾</span></button>
+      ${d !== T ? '<button class="pill" data-act="date" data-d="' + T + '">Today</button>' : ''}
+      <button class="iconbtn" data-act="shift" data-n="-7" aria-label="Previous week">‹</button>
+      <button class="iconbtn" data-act="shift" data-n="7" aria-label="Next week">›</button></div>
+    <div class="week">${week}</div></div></header>`;
+}
+function tabsHTML() {
+  const badge = lateNow().length + callList().length;
+  const t = (k, l, b) => `<button class="tab ${UI.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}">${ICONS[k]}${b ? `<em class="badge">${b}</em>` : ''}${l}</button>`;
+  return `<button class="fab" data-act="fab" aria-label="Book or add walk-in">+</button><nav class="tabs">${t('day', 'Calendar')}${t('queue', 'Queue', badge)}${t('patients', 'Patients')}${t('insights', 'Insights')}${t('more', 'More')}</nav>`;
+}
+
+/* ---------- Calendar ---------- */
+function tilesHTML(d) {
+  const T = today();
+  if (d === T) {
+    const n = nowMin(), list = dayAppts(d).filter(S.isActive);
+    const waiting = list.filter(a => a.status === 'arrived').length;
+    const inChair = list.filter(a => a.status === 'in_treatment');
+    let late = 0;
+    [1, 2].forEach(ch => S.project(DB.appts, d, ch, n).forEach(p => { if (!['done', 'in_treatment'].includes(p.appt.status)) late = Math.max(late, p.delay); }));
+    let free = 0;
+    [1, 2].forEach(ch => { for (let s = Math.max(S.OPEN, S.ceilTo(n, 30)); s < S.CLOSE; s += 30) if (!S.chairConflicts(DB.appts, { id: '_', date: d, chair: ch, start_min: s, duration_min: 30 }).length) free++; });
+    const calls = callList().length;
+    return `<div class="tiles">
+      <button class="tile t-mint" data-act="tab" data-t="queue"><span class="label">Waiting</span><span class="big">${waiting}</span><span class="note">In the waiting area</span></button>
+      <button class="tile t-peach" data-act="tab" data-t="queue"><span class="label">In chair</span><span class="big">${inChair.length}<small>/ 2</small></span><span class="note">${inChair.map(a => esc(patient(a.patient_id).name.split(' ')[0])).join(', ') || 'Both chairs empty'}</span></button>
+      <button class="tile t-lilac" data-act="tab" data-t="queue"><span class="label">Delay</span><span class="big">${late >= 5 ? '+' + Math.round(late) : '0'}<small>min</small></span><span class="note">${calls ? calls + ' patient' + (calls > 1 ? 's' : '') + ' to tell' : late >= 5 ? 'Running late' : 'Running on time'}</span></button>
+      <div class="tile t-sky"><span class="label">Free slots</span><span class="big">${free}</span><span class="note">Left today, both chairs</span></div></div>`;
+  }
+  const load = S.dayLoad(DB.appts, d);
+  const specs = chairDoctors(d, 0).filter(x => x.specialist).map(x => x.name);
+  return `<div class="tiles">
+    <div class="tile t-sky"><span class="label">Booked</span><span class="big">${load.booked}<small>/ ${load.total}</small></span><span class="note">30-minute slots</span></div>
+    <div class="tile t-lilac"><span class="label">Specialist</span><span class="big" style="font-size:20px;padding-block:7px">${specs.length ? esc(specs.join(', ')) : 'None'}</span><span class="note">${specs.length ? 'Visiting this day' : 'Clinic doctor only'}</span></div></div>`;
+}
+function attentionHTML() {
+  const rows = [];
+  const calls = callList().length, notes = notesPending().length, over = overdueFollowups().length, late = lateNow().length;
+  if (late) rows.push(['bad', late + ' patient' + (late > 1 ? 's' : '') + ' 15+ min late', 'Mark arrived or no-show', 'tab" data-t="queue']);
+  if (calls) rows.push(['warn', calls + ' patient' + (calls > 1 ? 's' : '') + ' to tell about a new time', 'Open the call list', 'tab" data-t="queue']);
+  if (notes) rows.push(['acc', notes + ' visit note' + (notes > 1 ? 's' : '') + ' pending', 'Add the plan and follow-up', 'list" data-l="notes']);
+  if (over) rows.push(['spec', over + ' follow-up' + (over > 1 ? 's' : '') + ' overdue', 'Book or dismiss', 'list" data-l="overdue']);
+  if (!rows.length) return '';
+  return `<section class="card attn"><h2 class="section-h">Needs attention</h2>${rows.map(r => `<button class="attn-row" data-act="${r[3]}">
+    <span class="chip ${r[0]}">${r[1].split(' ')[0]}</span><span class="attn-t"><b>${esc(r[1].replace(/^\d+ (.)/, (m, c) => c.toUpperCase()))}</b><small>${r[2]}</small></span><span aria-hidden="true">›</span></button>`).join('')}</section>`;
+}
+function dayHTML() {
+  const d = UI.date, T = today();
+  let out = `<div class="hello"><h1>${d === T ? greeting() + ', ' + esc(UI.user.split(' ')[0]) : fmtDate(d, { weekday: 'long' })}</h1>
+    <p>${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>`;
+  out += tilesHTML(d);
+  if (d === T) out += attentionHTML();
+  const ot = overtimeOn(d);
+  if (ot.length) out += `<div class="banner warn"><b>${ot.length} appointment${ot.length > 1 ? 's' : ''} after 9:00 PM.</b>
+    <span>${ot.map(a => esc(patient(a.patient_id).name) + ' at ' + hm(a.start_min)).join(', ')}. Check with the doctor.</span></div>`;
+  const fu = followupsDue(d);
+  if (fu.length) out += `<div class="remind"><div><h2>${fu.length} follow-up${fu.length > 1 ? 's' : ''} due</h2><span class="hint">These patients have no slot yet.</span></div>
+    ${fu.map(a => fuRow(a)).join('')}</div>`;
+  const chairs = UI.chairs ? [UI.chairs] : [1, 2];
+  out += `<div class="daybar"><h2 class="section-h">Chairs</h2>
+    <div class="seg" role="group" aria-label="Chairs">${[[0, 'Both'], [1, 'Chair 1'], [2, 'Chair 2']].map(([v, l]) => `<button class="${UI.chairs === v ? 'on' : ''}" data-act="chairs" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+  const rows = S.slotRows(DB.appts, d), H = rows.length, dm = delayMap(d), n = nowMin();
+  const head = chairs.map(ch => { const docs = chairDoctors(d, ch); return `<button data-act="reserve" data-ch="${ch}">Chair ${ch} <span class="resbtn">Reserve</span><small>${docs.length ? docs.map(x => esc(x.name)).join(', ') : 'No bookings'}</small></button>`; }).join('');
+  const times = rows.map((s, i) => `<span style="top:${i * ROW}px">${hm(s).replace(' AM', 'a').replace(' PM', 'p')}</span>`).join('');
+  const cols = chairs.map(ch => {
+    const list = dayAppts(d, ch), active = list.filter(S.isActive), blks = blocksOn(d, ch);
+    let html = '';
+    const ahTop = (S.CLOSE - S.OPEN) / 30 * ROW;
+    if (H * ROW > ahTop) html += `<div class="after-hours" style="top:${ahTop}px;height:${H * ROW - ahTop}px"></div>`;
+    blks.forEach(b => { html += `<div class="resv" style="top:${(b.start_min - S.OPEN) / 30 * ROW}px;height:${(b.end_min - b.start_min) / 30 * ROW}px"><span>Reserved · ${esc(doctor(b.doctor_id).name)}</span></div>`; });
+    rows.forEach((s, i) => {
+      if (s >= S.CLOSE || (d === T && s + 30 <= n)) return;
+      if (active.some(a => S.overlaps(a, { start_min: s, duration_min: 30 }))) return;
+      const b = blks.find(x => s >= x.start_min && s < x.end_min);
+      html += `<button class="free ${b ? 'inres' : ''}" style="top:${i * ROW + 3}px;height:${ROW - 6}px" data-act="book" data-ch="${ch}" data-s="${s}" aria-label="Book chair ${ch} at ${hm(s)}">+ ${b ? esc(doctor(b.doctor_id).name) : 'Free'}</button>`;
+    });
+    list.forEach(a => {
+      const doc = doctor(a.doctor_id), top = (a.start_min - S.OPEN) / 30 * ROW, ht = Math.max(a.duration_min / 30 * ROW - 4, 30);
+      const p = dm[a.id], late = S.noShowDue(a, n, T), tags = [];
+      if (doc.specialist) tags.push(`<span class="chip spec">${esc(doc.specialty || 'Specialist')}</span>`);
+      if (a.status !== 'booked') tags.push(`<span class="chip ${a.status === 'in_treatment' ? 'acc' : a.status === 'arrived' ? 'ok' : ''}">${STATUS[a.status]}</span>`);
+      if (late) tags.push('<span class="chip bad">15+ min late</span>');
+      if (p && p.delay >= 5 && a.status !== 'done') tags.push(`<span class="chip warn">+${Math.round(p.delay)} min</span>`);
+      if (a.kind === 'walkin') tags.push('<span class="chip">Walk-in</span>');
+      const short = ht < 70;
+      const sub = `<span class="sub">${hm(a.start_min)} · ${esc(doc.name)}${a.reason ? ' · ' + esc(a.reason) : ''}</span>`;
+      html += `<button class="blk ${a.status} ${doc.specialist ? 'spec' : ''}" style="top:${top + 2}px;height:${ht}px" data-act="open" data-id="${a.id}">
+        <span class="nm">${esc(patient(a.patient_id).name)}</span>${short && tags.length ? '' : sub}${tags.length && ht >= 46 ? `<span class="tags">${tags.join('')}</span>` : ''}</button>`;
+    });
+    return `<div class="ccol" style="height:${H * ROW}px">${html}</div>`;
+  }).join('');
+  const now = d === T && n >= S.OPEN && n <= S.OPEN + H * 30 ? `<div class="nowline" style="top:${(n - S.OPEN) / 30 * ROW}px"></div>` : '';
+  out += `<div class="gridwrap" style="--cols:${chairs.length}"><div class="chairhead"><div></div>${head}</div>
+    <div class="grid"><div class="tcol" style="height:${H * ROW}px">${times}</div>${cols}${now}</div></div>
+    <div class="legend"><span><i style="background:var(--sky)"></i>Clinic doctor</span><span><i style="background:var(--lilac)"></i>Specialist</span><span><i class="rs"></i>Reserved</span><span><i style="background:var(--mint)"></i>Waiting</span><span><i style="background:var(--peach)"></i>In chair</span></div>
+    <p class="hint" style="margin:0">Tap a free slot to book it. Tap a chair name to reserve it for a specialist.</p>`;
+  return out;
+}
+function fuRow(a, overdue) {
+  const late = overdue ? daysBetween(a.next_followup, today()) : 0;
+  return `<div class="fu"><div style="min-width:0"><div class="nm">${esc(patient(a.patient_id).name)}</div>
+    <div class="sub">${overdue ? `<b class="bad-t">Due ${late} day${late > 1 ? 's' : ''} ago</b> · ` : ''}${esc(a.treatment_done || a.reason)} on ${fmtDate(a.date)} · ${esc(doctor(a.note_doctor_id || a.doctor_id).name)}</div></div>
+    <div class="row" style="gap:6px;flex-wrap:nowrap">${overdue ? `<button class="btn sm" data-act="dismissfu" data-id="${a.id}">Dismiss</button>` : ''}<button class="btn sm dark" data-act="bookfu" data-id="${a.id}">Book</button></div></div>`;
+}
+
+/* ---------- Queue ---------- */
+function callListHTML() {
+  const list = callList();
+  if (!list.length) return '';
+  return `<section class="remind calls"><div><h2>Call list · ${list.length}</h2><span class="hint">Tell these patients the new time. Tick each one after you tell them.</span></div>
+    ${list.map(c => { const a = c.a, p = patient(a.patient_id);
+      const what = c.kind === 'moved'
+        ? `${a.moved_from_date !== a.date ? fmtDate(a.moved_from_date) + ' ' : ''}${hm(a.moved_from_min)} → <b>${a.moved_from_date !== a.date ? fmtDate(a.date) + ' ' : ''}${hm(a.start_min)}</b>`
+        : `Running ${c.delay} min late · about <b>${hm(c.pStart)}</b>`;
+      return `<div class="fu"><div style="min-width:0"><div class="nm">${esc(p.name)}${a.status === 'arrived' ? ' <span class="chip ok">Here</span>' : ''}</div>
+        <div class="sub">${what} · ${esc(doctor(a.doctor_id).name)}</div>
+        <div class="phone"><a href="tel:${esc(digits(p.phone))}">${esc(p.phone)}</a><button class="linkbtn" data-act="copy" data-v="${esc(p.phone)}">Copy</button></div></div>
+        <button class="btn sm dark" data-act="inform" data-id="${a.id}" data-k="${c.kind}" data-d="${c.delay || 0}">Told ✓</button></div>`; }).join('')}</section>`;
+}
+function queueHTML() {
+  const T = today();
+  let out = `<div class="hello"><h1>Today's queue</h1><p>${fmtDate(T, { weekday: 'long', day: 'numeric', month: 'long' })}</p></div>`;
+  out += callListHTML();
+  out += `<div class="row"><button class="btn grow" data-act="delay">Doctor running late</button><button class="btn grow" data-act="moveday">Move a doctor's day</button></div>`;
+  const n = nowMin();
+  [1, 2].forEach(ch => {
+    const proj = S.project(DB.appts, T, ch, n);
+    const done = proj.filter(p => p.appt.status === 'done'), open = proj.filter(p => p.appt.status !== 'done');
+    const firstWait = open.find(p => p.appt.status !== 'in_treatment');
+    const lateBy = firstWait ? Math.round(firstWait.delay) : 0;
+    const noShows = DB.appts.filter(a => a.date === T && a.chair === ch && a.status === 'no_show');
+    out += `<section><div class="qhead"><h2>Chair ${ch}</h2><span class="muted" style="font-weight:700">${chairDoctors(T, ch).map(d => esc(d.name)).join(', ') || 'No bookings'}</span>
+      <span style="margin-left:auto" class="chip ${lateBy >= 5 ? 'warn' : 'ok'}">${lateBy >= 5 ? 'Running ' + lateBy + ' min late' : 'On time'}</span></div><div class="tl">`;
+    if (done.length) out += `<div class="qrow"><span class="dot done">✓</span><div class="qdone">${done.length} done today: ${done.map(p => esc(patient(p.appt.patient_id).name.split(' ')[0])).join(', ')}</div></div>`;
+    if (!open.length && !noShows.length) out += `<div class="card empty">No more patients in Chair ${ch} today.</div>`;
+    open.forEach(p => out += queueRow(p, n, T));
+    noShows.forEach(a => out += queueRow({ appt: a, pStart: a.start_min, delay: 0 }, n, T));
+    out += '</div></section>';
+  });
+  return out;
+}
+function queueRow(p, n, T) {
+  const a = p.appt, doc = doctor(a.doctor_id);
+  let act = '';
+  if (a.status === 'booked') act = (S.noShowDue(a, n, T) ? `<button class="btn sm" data-act="noshow" data-id="${a.id}">No-show</button>` : '') + `<button class="btn sm primary" data-act="arrive" data-id="${a.id}">Arrived</button>`;
+  else if (a.status === 'arrived') act = `<button class="btn sm dark" data-act="start" data-id="${a.id}">Start</button>`;
+  else if (a.status === 'in_treatment') { const el = Math.round(n - (a.started_min ?? a.start_min)); act = `<span class="timer ${el > a.duration_min ? 'over' : ''}">${el} of ${a.duration_min} min</span><button class="btn sm" data-act="extend" data-id="${a.id}">+15 min</button><button class="btn sm primary" data-act="end" data-id="${a.id}">End</button>`; }
+  else if (a.status === 'no_show') act = `<button class="btn sm" data-act="latearrive" data-id="${a.id}">Arrived late</button>`;
+  const dot = { in_treatment: 'now', arrived: 'wait', no_show: 'miss' }[a.status] || '';
+  return `<div class="qrow"><span class="dot ${dot}"></span><div class="qcard ${a.status === 'in_treatment' ? 'now' : ''}">
+    <div class="qmain"><button class="nm" data-act="open" data-id="${a.id}">${esc(patient(a.patient_id).name)}</button>
+      <div class="sub">${esc(doc.name)}${a.reason ? ' · ' + esc(a.reason) : ''}</div>
+      <div class="row" style="gap:4px;margin-top:4px">${doc.specialist ? `<span class="chip spec">${esc(doc.specialty || 'Specialist')}</span>` : ''}<span class="chip ${a.status === 'in_treatment' ? 'acc' : a.status === 'arrived' ? 'ok' : a.status === 'no_show' ? 'bad' : ''}">${STATUS[a.status]}</span>${S.noShowDue(a, n, T) ? '<span class="chip bad">15+ min late</span>' : ''}${a.late ? '<span class="chip warn">Came late</span>' : ''}${p.delay >= 5 && a.status !== 'in_treatment' ? `<span class="chip warn">+${Math.round(p.delay)} min</span>` : ''}</div>
+      <div class="row" style="margin-top:8px;gap:6px">${act}</div></div>
+    <div class="qside"><div class="qtime">${hm(p.pStart)}${p.delay >= 5 ? `<s>${hm(a.start_min)}</s>` : ''}</div><span class="timer">${a.duration_min} min</span></div></div></div>`;
+}
+
+/* ---------- Patients ---------- */
+function patientSummary() {
+  const T = today(), m = {};
+  DB.patients.forEach(p => { m[p.id] = { p, last: null, next: null, visits: 0 }; });
+  DB.appts.forEach(a => {
+    const r = m[a.patient_id]; if (!r) return;
+    if (a.status === 'done') { r.visits++; if (!r.last || a.date > r.last.date) r.last = a; }
+    if (S.isActive(a) && a.status !== 'done' && a.date >= T && (!r.next || a.date + pad(a.start_min) < r.next.date + pad(r.next.start_min))) r.next = a;
+  });
+  return Object.values(m);
+}
+function patientRows(q) {
+  q = q.trim().toLowerCase();
+  const dq = digits(q);
+  let list = patientSummary();
+  if (q) list = list.filter(r => r.p.name.toLowerCase().includes(q) || (dq.length >= 3 && digits(r.p.phone).includes(dq)));
+  list.sort((x, y) => ((y.next || y.last || {}).date || '').localeCompare((x.next || x.last || {}).date || ''));
+  if (!list.length) return `<div class="card empty">No patient matches "${esc(q)}". Book a new patient with the + button.</div>`;
+  return list.slice(0, 50).map(r => `<button class="prow" data-act="patient" data-id="${r.p.id}"><b class="pav">${esc(r.p.name[0])}</b>
+    <span class="pmain"><b>${esc(r.p.name)}</b><small>${esc(r.p.phone)} · ${r.visits} visit${r.visits === 1 ? '' : 's'}</small></span>
+    <span class="pside">${r.next ? `<span class="chip acc">${fmtDate(r.next.date, { day: 'numeric', month: 'short' })}</span>` : r.last ? `<small>Last ${fmtDate(r.last.date, { day: 'numeric', month: 'short' })}</small>` : ''}</span></button>`).join('');
+}
+function patientsHTML() {
+  return `<div class="hello"><h1>Patients</h1><p>${DB.patients.length} patients. Search by name or phone.</p></div>
+    <label class="field search"><span class="label">Search</span><input id="pSearch" type="search" value="${esc(UI.pq)}" placeholder="Name or phone number" autocomplete="off"></label>
+    <div class="card plist" id="pList">${patientRows(UI.pq)}</div>`;
+}
+
+/* ---------- Insights ---------- */
+function insightsData() {
+  const f = UI.ins, T = today(), from = addDays(T, -(f.range - 1));
+  const base = DB.appts.filter(a => a.date >= from && a.date <= T && a.status !== 'cancelled' &&
+    (!f.doc || a.doctor_id === f.doc) && (!f.chair || a.chair === f.chair) && (!f.treat || (a.treatment_done || a.reason) === f.treat));
+  const done = base.filter(a => a.status === 'done' && a.ended_min != null);
+  const noshow = base.filter(a => a.status === 'no_show');
+  const days = []; for (let i = f.range - 1; i >= 0; i--) days.push(addDays(T, -i));
+  const openDays = new Set(done.map(a => a.date)).size || 1;
+  const avg = arr => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0;
+  const waitOf = a => Math.max(0, (a.started_min ?? a.start_min) - (a.sched_min ?? a.start_min));
+  const actualOf = a => a.ended_min - (a.started_min ?? a.start_min);
+  const bookedOf = a => a.booked_min ?? a.duration_min;
+  const group = (key) => { const g = {}; base.forEach(a => { const k = key(a); (g[k] = g[k] || { done: [], noshow: 0 }); if (a.status === 'done' && a.ended_min != null) g[k].done.push(a); if (a.status === 'no_show') g[k].noshow++; }); return g; };
+  const hours = {}; for (let h = 10; h < 21; h++) hours[h] = 0;
+  done.forEach(a => { const h = Math.floor((a.sched_min ?? a.start_min) / 60); if (hours[h] !== undefined) hours[h]++; });
+  return { from, T, base, done, noshow, days, openDays, avg, waitOf, actualOf, bookedOf,
+    perDay: days.map(d => ({ d, n: done.filter(a => a.date === d).length })),
+    byDoc: group(a => a.doctor_id), byTreat: group(a => a.treatment_done || a.reason || 'Other'), hours,
+    chairUse: [1, 2].map(ch => ({ ch, min: done.filter(a => a.chair === ch).reduce((s, a) => s + actualOf(a), 0) })) };
+}
+function vbars(points, label, tip) {
+  const W = 340, Hh = 150, padL = 26, padB = 22, max = Math.max(1, ...points.map(p => p.v));
+  const top = max > 10 ? Math.ceil(max / 10) * 10 : Math.max(2, Math.ceil(max / 2) * 2), bw = (W - padL) / points.length, gap = Math.min(2, bw * .25);
+  const y = v => (Hh - padB) - v / top * (Hh - padB - 8);
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" class="chart" role="img" aria-label="${esc(label)}">`;
+  [0, top / 2, top].forEach(v => { s += `<line x1="${padL}" x2="${W}" y1="${y(v)}" y2="${y(v)}" class="gridl"/><text x="${padL - 5}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`; });
+  points.forEach((p, i) => {
+    const x = padL + i * bw + gap / 2, h = (Hh - padB) - y(p.v), w = Math.max(1, bw - gap);
+    const r = Math.min(4, w / 2, h);
+    if (p.v > 0) s += `<path d="M${x},${Hh - padB} V${y(p.v) + r} q0,-${r} ${r},-${r} H${x + w - r} q${r},0 ${r},${r} V${Hh - padB} Z" class="bar"/>`;
+    s += `<rect x="${padL + i * bw}" y="0" width="${bw}" height="${Hh - padB}" fill="transparent" data-tip="${esc(tip(p))}"/>`;
+    if (p.lab) s += `<text x="${x + w / 2}" y="${Hh - 6}" text-anchor="middle" class="axis">${esc(p.lab)}</text>`;
+  });
+  return s + '</svg>';
+}
+function hbars(rows, fmtVal) {
+  const max = Math.max(1, ...rows.map(r => r.v));
+  return `<div class="hb">${rows.map(r => `<div class="hb-row" data-tip="${esc(r.tip)}"><span class="hb-l">${esc(r.l)}</span>
+    <span class="hb-track"><i style="width:${Math.max(r.v > 0 ? 2 : 0, r.v / max * 100)}%"></i></span><span class="hb-v">${fmtVal(r)}</span>${r.sub ? `<small class="hb-s">${r.sub}</small>` : ''}</div>`).join('')}</div>`;
+}
+function insightsHTML() {
+  const f = UI.ins, x = insightsData();
+  const treats = [...new Set(DB.appts.filter(a => a.status === 'done').map(a => a.treatment_done || a.reason).filter(Boolean))].sort();
+  const seen = x.done.length, ns = x.noshow.length;
+  const nsRate = seen + ns ? ns / (seen + ns) * 100 : 0;
+  const wait = x.avg(x.done.map(x.waitOf));
+  const over = x.avg(x.done.map(a => x.actualOf(a) - x.bookedOf(a)));
+  const overShare = seen ? x.done.filter(a => x.actualOf(a) - x.bookedOf(a) > 5).length / seen * 100 : 0;
+  const walk = seen ? x.done.filter(a => a.kind === 'walkin').length / seen * 100 : 0;
+  let out = `<div class="hello"><h1>Insights</h1><p>${fmtDate(x.from, { day: 'numeric', month: 'short' })} – ${fmtDate(x.T, { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
+    <div class="filters">
+      <div class="seg">${[7, 30, 90].map(r => `<button class="${f.range === r ? 'on' : ''}" data-act="insrange" data-v="${r}">${r} days</button>`).join('')}</div>
+      <div class="two"><label class="field"><span class="label">Doctor</span><select id="insDoc"><option value="">All doctors</option>${DB.doctors.map(d => `<option value="${d.id}" ${f.doc === d.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></label>
+      <label class="field"><span class="label">Chair</span><select id="insChair"><option value="0">Both chairs</option><option value="1" ${f.chair === 1 ? 'selected' : ''}>Chair 1</option><option value="2" ${f.chair === 2 ? 'selected' : ''}>Chair 2</option></select></label></div>
+      <label class="field"><span class="label">Treatment</span><select id="insTreat"><option value="">All treatments</option>${treats.map(t => `<option ${f.treat === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label></div>`;
+  out += `<div class="tiles">
+    <div class="tile t-mint"><span class="label">Patients seen</span><span class="big">${seen}</span><span class="note">${(seen / x.openDays).toFixed(1)} per working day</span></div>
+    <div class="tile t-peach"><span class="label">No-show rate</span><span class="big">${nsRate.toFixed(0)}<small>%</small></span><span class="note">${ns} missed visit${ns === 1 ? '' : 's'}</span></div>
+    <div class="tile t-lilac"><span class="label">Average wait</span><span class="big">${wait.toFixed(0)}<small>min</small></span><span class="note">Booked time to chair</span></div>
+    <div class="tile t-sky"><span class="label">Time vs booked</span><span class="big">${over >= 0 ? '+' : ''}${over.toFixed(0)}<small>min</small></span><span class="note">${overShare.toFixed(0)}% ran 5+ min over</span></div></div>`;
+  const step = Math.ceil(x.perDay.length / 6);
+  out += `<section class="card"><h2 class="section-h">Patients seen per day</h2>
+    ${vbars(x.perDay.map((p, i) => ({ v: p.n, lab: (i % step === 0) ? fmtDate(p.d, { day: 'numeric', month: 'short' }) : '', d: p.d })), 'Patients seen per day', p => fmtDate(p.d) + ' · ' + p.v + ' patients')}
+    <p class="hint" style="margin:4px 0 0">${walk.toFixed(0)}% of visits were walk-ins.</p></section>`;
+  out += `<section class="card"><h2 class="section-h">Busiest hours</h2>
+    ${vbars(Object.keys(x.hours).map(h => ({ v: x.hours[h], lab: (h % 2 === 0) ? hm(h * 60).replace(':00', '').replace(' AM', 'a').replace(' PM', 'p') : '', h })), 'Visits by booked hour', p => hm(p.h * 60) + ' · ' + p.v + ' visits')}</section>`;
+  const docRows = Object.keys(x.byDoc).map(id => { const g = x.byDoc[id], n = g.done.length, r = n + g.noshow ? g.noshow / (n + g.noshow) * 100 : 0;
+    return { l: doctor(id).name, v: n, sub: `${r.toFixed(0)}% no-show · wait ${x.avg(g.done.map(x.waitOf)).toFixed(0)} min`, tip: `${doctor(id).name}: ${n} seen, ${g.noshow} no-shows` }; }).sort((a, b) => b.v - a.v);
+  out += `<section class="card"><h2 class="section-h">By doctor</h2>${docRows.length ? hbars(docRows, r => r.v) : '<p class="empty">No visits in this range.</p>'}</section>`;
+  const trRows = Object.keys(x.byTreat).map(t => { const g = x.byTreat[t], n = g.done.length;
+    return { l: t, v: n, sub: n ? `takes ${x.avg(g.done.map(x.actualOf)).toFixed(0)} min · booked ${x.avg(g.done.map(x.bookedOf)).toFixed(0)}` : '', tip: `${t}: ${n} visits` }; }).filter(r => r.v).sort((a, b) => b.v - a.v);
+  out += `<section class="card"><h2 class="section-h">By treatment</h2>${trRows.length ? hbars(trRows, r => r.v) : '<p class="empty">No visits in this range.</p>'}</section>`;
+  const open = x.openDays * (S.CLOSE - S.OPEN);
+  out += `<section class="card"><h2 class="section-h">Chair use</h2>${hbars(x.chairUse.filter(c => !f.chair || c.ch === f.chair).map(c => ({ l: 'Chair ' + c.ch, v: Math.round(c.min / open * 100), tip: `Chair ${c.ch}: ${Math.round(c.min / 60)} hours of treatment` })), r => r.v + '%')}
+    <p class="hint" style="margin:6px 0 0">Share of opening hours (10 AM–9 PM) with a patient in the chair, on working days.</p></section>`;
+  return out;
+}
+
+/* ---------- More: history, doctors, staff, settings ---------- */
+function moreHTML() {
+  const logs = DB.log.slice(0, UI.histAll ? 150 : 8);
+  let out = `<div class="hello"><h1>More</h1><p>History, doctors, staff and settings.</p></div>`;
+  out += `<section class="card"><h2 class="section-h">History</h2>${logs.length ? logs.map(e => { const t = new Date(e.at);
+    return `<div class="hrow ${e.undone ? 'undone' : ''}"><div><div class="lbl">${esc(e.label)}</div><div class="hint">${esc(e.by_name)} · ${t.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${t.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}${e.undone ? ' · Undone' : ''}</div></div>
+      ${e.undone ? '' : `<button class="btn sm" data-act="undo" data-id="${e.id}">Undo</button>`}</div>`; }).join('') : '<p class="hint">No changes yet. Every booking, move and status change shows here, with Undo.</p>'}
+    ${DB.log.length > 8 ? `<button class="btn sm" data-act="histall">${UI.histAll ? 'Show less' : 'Show all ' + DB.log.length}</button>` : ''}</section>`;
+  out += `<section class="card"><div class="qhead"><h2 class="section-h" style="margin:0">Doctors</h2>${isAdmin() ? '<button class="btn sm" style="margin-left:auto" data-act="doc">+ Add doctor</button>' : ''}</div>
+    ${DB.doctors.map(d => `<div class="hrow"><div><div class="lbl">${esc(d.name)}${d.active === false ? ' <span class="chip">Inactive</span>' : ''}</div>
+      <div class="hint">${d.specialist ? `<span class="chip spec">${esc(d.specialty || 'Specialist')}</span>` : esc(d.specialty || 'Clinic doctor')}</div></div>
+      ${isAdmin() ? `<button class="btn sm" data-act="doc" data-id="${d.id}">Edit</button>` : ''}</div>`).join('')}
+    ${isAdmin() ? '' : '<p class="hint">Only the admin can add or edit doctors.</p>'}</section>`;
+  if (isAdmin()) {
+    out += `<section class="card"><h2 class="section-h">Staff</h2>
+      ${DB.requests.length ? `<div class="label" style="margin-bottom:6px">Waiting for approval</div>${DB.requests.map(r => `<div class="hrow"><div><div class="lbl">${esc(r.name || r.email)}</div><div class="hint">${esc(r.email || '')}</div></div>
+        <div class="row" style="gap:6px;flex-wrap:nowrap"><select class="minisel" id="rq-${esc(r.user_id)}">${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === 'receptionist' ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
+        <button class="btn sm primary" data-act="approve" data-id="${esc(r.user_id)}">Approve</button><button class="btn sm" data-act="decline" data-id="${esc(r.user_id)}">✕</button></div></div>`).join('')}` : ''}
+      ${DB.staff.map(s => `<div class="hrow"><div><div class="lbl">${esc(s.name)}</div></div><div class="row" style="gap:6px;flex-wrap:nowrap">
+        <select class="minisel" data-uid="${esc(s.user_id)}" ${s.user_id === UI.userId ? 'disabled' : ''}>${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === s.role ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
+        ${s.user_id === UI.userId ? '' : `<button class="btn sm danger" data-act="unstaff" data-id="${esc(s.user_id)}">Remove</button>`}</div></div>`).join('')}
+      <p class="hint" style="margin:6px 0 0">New staff tap "New staff? Ask for access" on the sign-in screen. Their request shows here.</p></section>`;
+  }
+  out += `<section class="card"><h2 class="section-h">Clinic rules</h2><dl class="kv"><dt>Hours</dt><dd>10:00 AM to 9:00 PM</dd><dt>Slot</dt><dd>30 minutes</dd>
+    <dt>Chairs</dt><dd>Chair 1 and Chair 2</dd><dt>No-show</dt><dd>Suggested after 15 minutes late</dd><dt>Delays</dt><dd>Call list after a move, or 15+ minutes late</dd></dl></section>`;
+  if (LIVE) out += `<section class="card"><h2 class="section-h">Account</h2><p>Signed in as <b>${esc(UI.user)}</b> (${esc(ROLE_NAME[UI.role] || UI.role)}).</p>
+    <p class="hint">Add this site to the home screen: open the browser menu, then tap "Add to Home Screen".</p><button class="btn" data-act="signout">Sign out</button></section>`;
+  else {
+    const cm = Math.floor(nowMin());
+    out += `<section class="card" style="display:grid;gap:12px"><h2 class="section-h" style="margin:0">Demo controls</h2>
+      <p class="hint" style="margin:0">This demo keeps made-up sample data on this phone only.</p>
+      <div class="field"><span class="label">Act as</span><div class="seg">${Object.keys(ROLE_NAME).map(v => `<button class="${UI.role === v ? 'on' : ''}" data-act="role" data-v="${v}">${ROLE_NAME[v]}</button>`).join('')}</div></div>
+      <label class="field"><span class="label">Demo clock</span><input id="demoTime" type="time" value="${pad(Math.floor(cm / 60))}:${pad(cm % 60)}" ${demoClock.real ? 'disabled' : ''}></label>
+      <label class="row"><input id="demoReal" type="checkbox" ${demoClock.real ? 'checked' : ''}> Use the real time</label>
+      <button class="btn danger" data-act="reset">Reset demo data</button></section>`;
+  }
+  return out;
+}
+
+/* ===== Sheets ===== */
+function openSheet(html, bind) {
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="panel" role="dialog" aria-modal="true">${html}</div>`;
+  sh.hidden = false;
+  const panel = $('.panel', sh);
+  panel.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheet));
+  if (bind) bind(panel);
+}
+function closeSheet() { const sh = $('#sheet'); sh.hidden = true; sh.innerHTML = ''; }
+$('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+const sheetHead = t => `<div class="panel-h"><h3>${t}</h3><button class="iconbtn" data-close aria-label="Close">×</button></div>`;
+const doctorOptions = sel => DB.doctors.filter(d => d.active !== false || d.id === sel).map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${d.specialist ? ' — ' + esc(d.specialty || 'Specialist') : ''}</option>`).join('');
+const quick = (id, list, sel) => `<div class="quick" id="${id}">${list.map(x => `<button type="button" class="${String(x) === String(sel) ? 'on' : ''}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
+function bindQuick(panel, qid, inputId) {
+  const q = $('#' + qid, panel), inp = $('#' + inputId, panel);
+  q.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; inp.value = b.dataset.v; q.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); });
+}
+const minOptions = (sel, from = S.OPEN, to = S.CLOSE + 60) => { let o = ''; for (let s = from; s <= to; s += 30) o += `<option value="${s}" ${s === sel ? 'selected' : ''}>${hm(s)}</option>`; return o; };
+
+function fabSheet() {
+  openSheet(sheetHead('Add a patient') + `<div class="choose">
+    <button class="t-sky" data-act="book"><b>Book</b><span>Pick a date, chair and slot</span></button>
+    <button class="t-mint" data-act="walkin"><b>Walk-in</b><span>Goes to the first free gap today</span></button></div>`);
+}
+
+/* Patient picker: search by phone or name. One phone can have many patients. */
+function patientFields(pre) {
+  return `<div class="two"><label class="field"><span class="label">Phone</span><input id="fPhone" type="tel" inputmode="numeric" value="${esc(pre.phone || '')}" placeholder="98400 12345"></label>
+    <label class="field"><span class="label">Patient name</span><input id="fName" value="${esc(pre.name || '')}" autocomplete="off"></label></div>
+    <div id="fMatches" class="quick"></div><input type="hidden" id="fPid" value="${esc(pre.id || '')}">`;
+}
+function bindPatient(panel, onPick) {
+  const ph = $('#fPhone', panel), nm = $('#fName', panel), pid = $('#fPid', panel), box = $('#fMatches', panel);
+  const draw = () => {
+    const dg = digits(ph.value), q = nm.value.trim().toLowerCase();
+    let m = [];
+    if (dg.length >= 4) m = DB.patients.filter(p => digits(p.phone).includes(dg));
+    else if (q.length >= 2 && !pid.value) m = DB.patients.filter(p => p.name.toLowerCase().includes(q));
+    m = m.slice(0, 6);
+    box.innerHTML = m.map(p => `<button type="button" class="${p.id === pid.value ? 'on' : ''}" data-id="${p.id}">${esc(p.name)} · ${esc(p.phone)}</button>`).join('') +
+      (m.length ? `<span class="hint">${pid.value ? 'Existing patient selected.' : 'Pick a patient, or keep typing to add a new one.'}</span>` : '');
+  };
+  ph.addEventListener('input', () => { pid.value = ''; draw(); });
+  nm.addEventListener('input', () => { if (pid.value && patient(pid.value).name !== nm.value) pid.value = ''; draw(); });
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const p = patient(b.dataset.id); pid.value = p.id; nm.value = p.name; ph.value = p.phone; draw(); if (onPick) onPick(p); });
+  draw();
+}
+function resolvePatient(panel, tx) {
+  const name = $('#fName', panel).value.trim(), phone = $('#fPhone', panel).value.trim(), pid = $('#fPid', panel).value;
+  if (!name) return { error: 'Enter the patient name.' };
+  if (digits(phone).length < 10) return { error: 'Enter a 10-digit phone number.' };
+  if (pid) { const p = patient(pid); if (p.phone !== phone) tx.update('patients', pid, { phone }); return { id: pid }; }
+  const same = DB.patients.find(p => digits(p.phone) === digits(phone) && p.name.toLowerCase() === name.toLowerCase());
+  if (same) return { id: same.id };
+  const id = uid(); tx.insert('patients', { id, name, phone }); return { id, isNew: true };
+}
+
+function timeOptions(cand, sel) {
+  const opts = [];
+  for (let s = S.OPEN; s <= S.CLOSE + 60; s += 30) opts.push(s);
+  if (sel != null && !opts.includes(sel)) { opts.push(sel); opts.sort((a, b) => a - b); }
+  return opts.map(s => {
+    const c = S.check(DB.appts, DB.blocks, Object.assign({}, cand, { start_min: s }));
+    const tag = c.chair.length ? ' — booked (' + patient(c.chair[0].patient_id).name + ')' : c.doctor.length ? ' — doctor busy in Chair ' + c.doctor[0].chair
+      : c.reserved ? ' — reserved for ' + doctor(c.reserved.doctor_id).name : c.overtime ? ' — after hours' : '';
+    return `<option value="${s}" ${s === sel ? 'selected' : ''} ${c.chair.length && s !== sel ? 'disabled' : ''}>${hm(s)}${esc(tag)}</option>`;
+  }).join('');
+}
+const REPEAT = [['', 'Once', 0, 1], ['7x2', 'Weekly, 2 visits', 7, 2], ['7x3', 'Weekly, 3 visits', 7, 3], ['7x4', 'Weekly, 4 visits', 7, 4], ['14x3', 'Every 2 weeks, 3 visits', 14, 3], ['30x3', 'Monthly, 3 visits', 30, 3]];
+
+function bookSheet(pre = {}) {
+  closeSheet();
+  const a = pre.id ? appt(pre.id) : null;
+  const p = a ? patient(a.patient_id) : pre.patient || {};
+  const date = a ? a.date : pre.date || UI.date;
+  const chair = a ? a.chair : pre.chair || 1;
+  const dur = a ? a.duration_min : pre.duration || 30;
+  let start = a ? a.start_min : pre.start;
+  const docId = a ? a.doctor_id : pre.doctor_id || defaultDoctor(date, chair, start);
+  if (start == null) start = S.firstGap(DB.appts, date, chair, dur, date === today() ? nowMin() : S.OPEN, [], docId, DB.blocks) ?? S.OPEN;
+  openSheet(sheetHead(a ? 'Edit appointment' : 'Book appointment') + `<form id="bk" style="display:grid;gap:12px">
+    ${patientFields(p)}
+    <label class="field"><span class="label">Doctor</span><select id="fDoc">${doctorOptions(docId)}</select></label>
+    <div class="two"><label class="field"><span class="label">Date</span><input id="fDate" type="date" value="${date}"></label>
+      <label class="field"><span class="label">Chair</span><select id="fChair"><option value="1" ${chair === 1 ? 'selected' : ''}>Chair 1</option><option value="2" ${chair === 2 ? 'selected' : ''}>Chair 2</option></select></label></div>
+    <div class="two"><label class="field"><span class="label">Time</span><select id="fTime"></select></label>
+      <label class="field"><span class="label">Length</span><select id="fDur">${[15, 30, 45, 60, 90, 120].map(m => `<option value="${m}" ${m === dur ? 'selected' : ''}>${m} min</option>`).join('')}${[15, 30, 45, 60, 90, 120].includes(dur) ? '' : `<option value="${dur}" selected>${dur} min</option>`}</select></label></div>
+    <label class="field"><span class="label">Reason</span><input id="fReason" value="${esc(a ? a.reason : pre.reason || '')}" placeholder="For example: RCT 36"></label>
+    ${quick('fQuick', TREATMENTS, a ? a.reason : '')}
+    ${a ? '' : `<label class="field"><span class="label">Repeat</span><select id="fRep">${REPEAT.map(r => `<option value="${r[0]}">${r[1]}</option>`).join('')}</select></label><div id="fSeries"></div>`}
+    <div id="fMsg"></div>
+    <button class="btn primary" id="fSave">${a ? 'Save changes' : 'Book'}</button></form>`, panel => {
+    const g = id => $('#' + id, panel);
+    bindPatient(panel); bindQuick(panel, 'fQuick', 'fReason');
+    let confirm = '';
+    const cand = () => ({ id: a ? a.id : '__new', date: g('fDate').value, chair: +g('fChair').value, start_min: +g('fTime').value, duration_min: +g('fDur').value, doctor_id: g('fDoc').value });
+    const rep = () => REPEAT.find(r => r[0] === (g('fRep') ? g('fRep').value : '')) || REPEAT[0];
+    const refresh = keep => {
+      const c = cand();
+      g('fTime').innerHTML = timeOptions(c, keep && !isNaN(c.start_min) ? c.start_min : start);
+      check();
+    };
+    const check = () => {
+      const c = cand(), msg = g('fMsg'), r = S.check(DB.appts, DB.blocks, c), warns = [];
+      g('fSave').className = 'btn primary'; g('fSave').textContent = a ? 'Save changes' : 'Book';
+      if (r.chair.length) { msg.innerHTML = `<div class="err">Chair ${c.chair} is booked at ${hm(r.chair[0].start_min)} for ${esc(patient(r.chair[0].patient_id).name)}. Pick another time or chair.</div>`; return false; }
+      const pid = g('fPid').value;
+      const twice = pid && DB.appts.find(x => x.patient_id === pid && x.id !== c.id && x.date === c.date && S.isActive(x) && S.overlaps(x, c));
+      if (twice) { msg.innerHTML = `<div class="err">${esc(patient(pid).name)} already has Chair ${twice.chair} at ${hm(twice.start_min)}.</div>`; return false; }
+      if (r.doctor.length) warns.push(`${esc(doctor(c.doctor_id).name)} is also in Chair ${r.doctor[0].chair} at ${hm(r.doctor[0].start_min)} with ${esc(patient(r.doctor[0].patient_id).name)}.`);
+      if (r.reserved) warns.push(`Chair ${c.chair} is reserved for ${esc(doctor(r.reserved.doctor_id).name)} from ${hm(r.reserved.start_min)} to ${hm(r.reserved.end_min)}.`);
+      if (r.overtime) warns.push(`This ends at ${hm(S.end(c))}, after 9:00 PM. Check with the doctor.`);
+      let series = '';
+      if (!a && rep()[3] > 1) {
+        const plan = S.planSeries(DB.appts, DB.blocks, c, rep()[2], rep()[3]);
+        series = `<div class="card soft"><div class="label">Also books</div>${plan.map(v => `<div class="srow ${v.overtime ? 'bad-t' : ''}">${fmtDate(v.date)} · ${hm(v.start_min)} · Chair ${v.chair}${v.sameTime ? '' : ' <span class="chip warn">time changed</span>'}</div>`).join('')}</div>`;
+      }
+      if (g('fSeries')) g('fSeries').innerHTML = series;
+      confirm = warns.join(' ');
+      msg.innerHTML = warns.length ? `<div class="banner warn">${warns.map(w => `<span>${w}</span>`).join('')}</div>` : '';
+      if (warns.length) { g('fSave').className = 'btn warn'; g('fSave').textContent = a ? 'Save anyway' : 'Book anyway'; }
+      return true;
+    };
+    ['fDate', 'fChair', 'fDur', 'fDoc'].forEach(id => g(id).addEventListener('change', () => refresh(true)));
+    g('fTime').addEventListener('change', check);
+    if (g('fRep')) g('fRep').addEventListener('change', check);
+    $('#fMatches', panel).addEventListener('click', () => setTimeout(check));
+    refresh(false);
+    g('bk').addEventListener('submit', e => {
+      e.preventDefault();
+      if (!check()) return;
+      const tx = Tx(); const pr = resolvePatient(panel, tx);
+      if (pr.error) { g('fMsg').innerHTML = `<div class="err">${pr.error}</div>`; return; }
+      const c = cand(), name = g('fName').value.trim();
+      const row = { patient_id: pr.id, doctor_id: c.doctor_id, date: c.date, chair: c.chair, start_min: c.start_min, duration_min: c.duration_min, reason: g('fReason').value.trim() };
+      let extra = '';
+      if (a) tx.update('appointments', a.id, Object.assign(row, a.start_min !== row.start_min || a.date !== row.date ? { sched_min: null, moved_from_min: null, moved_from_date: null, informed: false } : {}));
+      else {
+        const r = rep(), sid = r[3] > 1 ? uid() : null;
+        tx.insert('appointments', newAppt(Object.assign({ series_id: sid }, row)));
+        if (sid) {
+          S.planSeries(DB.appts, DB.blocks, Object.assign({ id: '__new' }, row), r[2], r[3]).forEach(v =>
+            tx.insert('appointments', newAppt(Object.assign({}, row, { date: v.date, chair: v.chair, start_min: v.start_min, series_id: sid }))));
+          extra = ' + ' + (r[3] - 1) + ' more';
+        }
+      }
+      closeSheet(); UI.date = c.date;
+      commit((a ? 'Changed ' : 'Booked ') + name + ' · ' + fmtDate(c.date) + ' ' + hm(c.start_min) + ' · Chair ' + c.chair + extra, tx);
+    });
+  });
+}
+
+function walkInSheet() {
+  closeSheet();
+  const T = today();
+  openSheet(sheetHead('Add walk-in') + `<form id="wk" style="display:grid;gap:12px">
+    ${patientFields({})}
+    <label class="field"><span class="label">Doctor</span><select id="fDoc">${doctorOptions(defaultDoctor(T, 1, nowMin()))}</select></label>
+    <div class="two"><label class="field"><span class="label">Chair</span><select id="fChair"><option value="0">Any chair</option><option value="1">Chair 1</option><option value="2">Chair 2</option></select></label>
+      <label class="field"><span class="label">Length</span><select id="fDur"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></label></div>
+    <label class="field"><span class="label">Reason</span><input id="fReason" placeholder="For example: Tooth pain"></label>
+    ${quick('fQuick', TREATMENTS, '')}
+    <div id="fPlace" class="card soft"></div><div id="fMsg"></div>
+    <button class="btn primary" id="fSave">Add to queue</button></form>`, panel => {
+    bindPatient(panel); bindQuick(panel, 'fQuick', 'fReason');
+    const g = id => $('#' + id, panel);
+    let place;
+    const calc = () => {
+      const ch = +g('fChair').value;
+      place = S.placeWalkIn(DB.appts, T, +g('fDur').value, nowMin(), ch ? [ch] : [1, 2], g('fDoc').value, DB.blocks);
+      g('fPlace').innerHTML = `<div class="label">Goes to</div><div style="font-size:19px;font-weight:900">Chair ${place.chair} at ${hm(place.start)}</div>
+        <div class="hint">${place.gap ? 'This is the first gap where the chair and ' + esc(doctor(g('fDoc').value).name) + ' are both free.' : 'No free gap today. This is the end of the queue.'}</div>
+        ${place.overtime ? '<div class="banner warn" style="margin-top:8px">This goes past 9:00 PM. Check with the doctor.</div>' : ''}`;
+      g('fSave').textContent = place.overtime ? 'Add after 9 PM anyway' : 'Add to queue';
+      g('fSave').className = 'btn ' + (place.overtime ? 'warn' : 'primary');
+    };
+    ['fChair', 'fDur', 'fDoc'].forEach(id => g(id).addEventListener('change', calc));
+    calc();
+    g('wk').addEventListener('submit', e => {
+      e.preventDefault(); calc();
+      const tx = Tx(); const pr = resolvePatient(panel, tx);
+      if (pr.error) { g('fMsg').innerHTML = `<div class="err">${pr.error}</div>`; return; }
+      tx.insert('appointments', newAppt({ patient_id: pr.id, doctor_id: g('fDoc').value, date: T, chair: place.chair, start_min: place.start, duration_min: +g('fDur').value,
+        status: 'arrived', kind: 'walkin', reason: g('fReason').value.trim(), arrived_min: Math.round(nowMin()) }));
+      closeSheet(); UI.date = T;
+      commit('Walk-in ' + g('fName').value.trim() + ' · Chair ' + place.chair + ' ' + hm(place.start), tx);
+    });
+  });
+}
+
+function apptSheet(id) {
+  const a = appt(id); if (!a) return;
+  const p = patient(a.patient_id), doc = doctor(a.doctor_id), T = today(), n = nowMin();
+  const late = S.noShowDue(a, n, T);
+  let actions = '';
+  if (a.date === T) {
+    if (a.status === 'booked') actions = (late ? `<button class="btn grow" data-act="noshow" data-id="${a.id}">No-show</button>` : '') + `<button class="btn primary grow" data-act="arrive" data-id="${a.id}">Arrived</button>`;
+    if (a.status === 'arrived') actions = `<button class="btn primary grow" data-act="start" data-id="${a.id}">Start treatment</button>`;
+    if (a.status === 'in_treatment') actions = `<button class="btn grow" data-act="extend" data-id="${a.id}">+15 min</button><button class="btn primary grow" data-act="end" data-id="${a.id}">End treatment</button>`;
+    if (a.status === 'no_show') actions = `<button class="btn primary grow" data-act="latearrive" data-id="${a.id}">Arrived late</button>`;
+  }
+  if (a.status === 'done') actions = `<button class="btn primary grow" data-act="note" data-id="${a.id}">${a.note_doctor_id ? 'Edit visit note' : 'Add visit note'}</button>`;
+  const series = a.series_id ? DB.appts.filter(x => x.series_id === a.series_id && x.status !== 'cancelled').sort((x, y) => x.date.localeCompare(y.date)) : [];
+  openSheet(sheetHead(`<button class="linkbtn big" data-act="patient" data-id="${p.id}">${esc(p.name)} ›</button>`) + `
+    ${late ? '<div class="banner bad"><b>15+ minutes late.</b> Mark a no-show, or mark arrived if the patient is here.</div>' : ''}
+    <dl class="kv"><dt>Phone</dt><dd>${esc(p.phone)} <button class="linkbtn" data-act="copy" data-v="${esc(p.phone)}">Copy</button></dd>
+      <dt>When</dt><dd>${fmtDate(a.date)} · ${hm(a.start_min)}–${hm(S.end(a))}</dd>
+      ${a.moved_from_min != null ? `<dt>Moved from</dt><dd>${a.moved_from_date !== a.date ? fmtDate(a.moved_from_date) + ' ' : ''}${hm(a.moved_from_min)} ${a.informed ? '<span class="chip ok">Told</span>' : '<span class="chip warn">Not told</span>'}</dd>` : ''}
+      <dt>Chair</dt><dd>Chair ${a.chair}</dd>
+      <dt>Doctor</dt><dd>${esc(doc.name)} ${doc.specialist ? `<span class="chip spec">${esc(doc.specialty || 'Specialist')}</span>` : ''}</dd>
+      <dt>Status</dt><dd>${STATUS[a.status]}${a.kind === 'walkin' ? ' · Walk-in' : ''}${a.late ? ' · Came late' : ''}</dd>
+      ${a.reason ? `<dt>Reason</dt><dd>${esc(a.reason)}</dd>` : ''}
+      ${a.started_min != null ? `<dt>Treatment</dt><dd>${hm(a.started_min)}${a.ended_min != null ? '–' + hm(a.ended_min) + ' (' + Math.round(a.ended_min - a.started_min) + ' min, booked ' + (a.booked_min ?? a.duration_min) + ')' : ' · estimate ' + a.duration_min + ' min'}</dd>` : ''}
+      ${a.treatment_done ? `<dt>Done</dt><dd>${esc(a.treatment_done)}</dd>` : ''}
+      ${a.plan ? `<dt>Plan</dt><dd>${esc(a.plan)}</dd>` : ''}
+      ${a.next_followup ? `<dt>Follow-up</dt><dd>${fmtDate(a.next_followup)}</dd>` : ''}
+      ${series.length > 1 ? `<dt>Series</dt><dd>Visit ${series.findIndex(x => x.id === a.id) + 1} of ${series.length}</dd>` : ''}</dl>
+    ${actions ? `<div class="row">${actions}</div>` : ''}
+    <div class="row">${['booked', 'arrived', 'no_show'].includes(a.status) ? `<button class="btn grow" data-act="edit" data-id="${a.id}">Edit or move</button><button class="btn danger grow" id="cancelBtn">Cancel</button>` : ''}
+      <button class="btn grow" data-act="bookfor" data-id="${a.id}">Book again</button></div>`, panel => {
+    const cb = $('#cancelBtn', panel);
+    if (cb) cb.addEventListener('click', () => {
+      if (cb.dataset.sure) { const tx = Tx(); tx.update('appointments', a.id, { status: 'cancelled' }); closeSheet(); commit('Cancelled ' + p.name + ' · ' + hm(a.start_min), tx); }
+      else { cb.dataset.sure = '1'; cb.textContent = 'Tap again to cancel'; cb.className = 'btn warn grow'; }
+    });
+  });
+}
+
+function patientSheet(pid) {
+  const p = patient(pid), T = today();
+  const all = DB.appts.filter(a => a.patient_id === pid && a.status !== 'cancelled');
+  const upcoming = all.filter(a => a.date >= T && ['booked', 'arrived', 'in_treatment'].includes(a.status)).sort((x, y) => (x.date + pad(x.start_min)).localeCompare(y.date + pad(y.start_min)));
+  const visits = all.filter(a => a.status === 'done').sort((x, y) => y.date.localeCompare(x.date));
+  const missed = all.filter(a => a.status === 'no_show').length;
+  const family = DB.patients.filter(x => x.id !== pid && digits(x.phone) === digits(p.phone));
+  openSheet(sheetHead(esc(p.name)) + `
+    <dl class="kv"><dt>Phone</dt><dd>${esc(p.phone)} <button class="linkbtn" data-act="copy" data-v="${esc(p.phone)}">Copy</button></dd>
+      <dt>Visits</dt><dd>${visits.length} done${missed ? ` · <span class="bad-t">${missed} no-show${missed > 1 ? 's' : ''}</span>` : ''}</dd>
+      ${family.length ? `<dt>Same phone</dt><dd>${family.map(f => `<button class="linkbtn" data-act="patient" data-id="${f.id}">${esc(f.name)}</button>`).join(', ')}</dd>` : ''}</dl>
+    <div class="row"><button class="btn primary grow" data-act="bookpt" data-id="${pid}">Book</button><button class="btn grow" id="ptEdit">Edit details</button></div>
+    <div id="ptForm"></div>
+    <div><div class="label" style="margin-bottom:6px">Upcoming</div>${upcoming.length ? upcoming.map(a => `<button class="visit vbtn" data-act="open" data-id="${a.id}"><b>${fmtDate(a.date)} · ${hm(a.start_min)} · Chair ${a.chair}</b><span class="muted">${esc(doctor(a.doctor_id).name)}${a.reason ? ' · ' + esc(a.reason) : ''}</span></button>`).join('') : '<p class="hint" style="margin:0">No upcoming appointments.</p>'}</div>
+    <div><div class="label" style="margin-bottom:6px">Visit history</div>${visits.length ? visits.slice(0, 30).map(v => `<button class="visit vbtn" data-act="open" data-id="${v.id}"><b>${fmtDate(v.date, { day: 'numeric', month: 'short', year: 'numeric' })} · ${esc(v.treatment_done || v.reason || 'Visit')}</b>
+      <span class="muted">${esc(doctor(v.note_doctor_id || v.doctor_id).name)}${v.plan ? ' · ' + esc(v.plan) : ''}${v.next_followup ? ' · follow-up ' + fmtDate(v.next_followup) : ''}</span></button>`).join('') : '<p class="hint" style="margin:0">No visits yet.</p>'}</div>`, panel => {
+    $('#ptEdit', panel).addEventListener('click', () => {
+      $('#ptForm', panel).innerHTML = `<form id="pe" class="card soft" style="display:grid;gap:10px"><div class="two"><label class="field"><span class="label">Name</span><input id="peName" value="${esc(p.name)}"></label>
+        <label class="field"><span class="label">Phone</span><input id="pePhone" type="tel" value="${esc(p.phone)}"></label></div><button class="btn primary">Save details</button></form>`;
+      $('#pe', panel).addEventListener('submit', e => {
+        e.preventDefault();
+        const name = $('#peName', panel).value.trim(), phone = $('#pePhone', panel).value.trim();
+        if (!name || digits(phone).length < 10) return;
+        const tx = Tx(); tx.update('patients', pid, { name, phone }); commit('Edited ' + name, tx).then(() => patientSheet(pid));
+      });
+    });
+  });
+}
+
+function noteSheet(id) {
+  const a = appt(id), p = patient(a.patient_id);
+  const fu = [['1 week', 7], ['2 weeks', 14], ['1 month', 30], ['3 months', 90], ['6 months', 180]];
+  openSheet(sheetHead('Visit note · ' + esc(p.name)) + `<form id="nt" style="display:grid;gap:12px">
+    <label class="field"><span class="label">Treatment done</span><input id="nTreat" value="${esc(a.treatment_done || a.reason || '')}"></label>
+    ${quick('nQuick', TREATMENTS, a.treatment_done)}
+    <label class="field"><span class="label">Treatment plan</span><textarea id="nPlan" placeholder="For example: Obturation of 36 next visit. Crown after 2 weeks.">${esc(a.plan || '')}</textarea></label>
+    <label class="field"><span class="label">Next follow-up</span><input id="nFu" type="date" value="${a.next_followup || ''}"></label>
+    <div class="quick" id="nFuQ">${fu.map(([l, d]) => `<button type="button" data-d="${d}">${l}</button>`).join('')}<button type="button" data-d="">None</button></div>
+    <label class="field"><span class="label">Doctor who saw the patient</span><select id="nDoc">${doctorOptions(a.note_doctor_id || a.doctor_id)}</select></label>
+    <button class="btn primary">Save note</button></form>`, panel => {
+    bindQuick(panel, 'nQuick', 'nTreat');
+    $('#nFuQ', panel).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $('#nFu', panel).value = b.dataset.d ? addDays(a.date, +b.dataset.d) : ''; });
+    $('#nt', panel).addEventListener('submit', async e => {
+      e.preventDefault();
+      const nf = $('#nFu', panel).value || null, nd = $('#nDoc', panel).value;
+      const tx = Tx(); tx.update('appointments', a.id, { treatment_done: $('#nTreat', panel).value.trim(), plan: $('#nPlan', panel).value.trim(), next_followup: nf, note_doctor_id: nd, followup_dismissed: false });
+      closeSheet();
+      await commit('Visit note for ' + p.name, tx);
+      if (nf) openSheet(sheetHead('Book the follow-up now?') + `<p style="margin:0">Follow-up for <b>${esc(p.name)}</b> on <b>${fmtDate(nf, { weekday: 'long', day: 'numeric', month: 'long' })}</b>.</p>
+        <p class="hint" style="margin:0">If you skip this, the patient shows under "Follow-ups due" on that day, then under "Overdue".</p>
+        <div class="row"><button class="btn grow" data-close>Later</button><button class="btn primary grow" id="fuBook">Book slot</button></div>`, pn => {
+        $('#fuBook', pn).addEventListener('click', () => bookSheet({ patient: p, date: nf, doctor_id: nd, reason: 'Follow-up' }));
+      });
+    });
+  });
+}
+
+/* Preview of moves before applying. Overtime rows are red. Staff can still proceed. */
+function previewSheet(title, moves, extraTx, label, after) {
+  const ot = moves.filter(m => m.overtime);
+  const rows = moves.map(m => {
+    const a = appt(m.id), af = Object.assign({}, a, m.after);
+    const dateChange = af.date !== a.date ? fmtDate(af.date) + ' ' : '';
+    const chairChange = af.chair !== a.chair ? ' · Chair ' + af.chair : '';
+    return `<div class="change ${m.overtime ? 'ot' : ''}"><div><b>${esc(patient(a.patient_id).name)}</b><div class="hint">${esc(doctor(a.doctor_id).name)} · Chair ${a.chair}</div></div>
+      <div style="text-align:right;font-weight:700">${hm(a.start_min)} → ${dateChange}${hm(af.start_min)}${chairChange}${m.overtime ? '<div style="font-size:12px">after 9 PM</div>' : ''}</div></div>`;
+  }).join('');
+  openSheet(sheetHead(title) + `
+    ${ot.length ? `<div class="banner warn"><b>${ot.length} appointment${ot.length > 1 ? 's go' : ' goes'} past 9:00 PM.</b><span>Check with the doctor before you proceed.</span></div>` : ''}
+    ${moves.length ? `<div><div class="label">${moves.length} appointment${moves.length > 1 ? 's' : ''} will move</div>${rows}</div>` : '<p class="hint">No other appointments move.</p>'}
+    ${moves.length ? '<p class="hint" style="margin:0">These patients go on the call list in Queue. You can undo this from More > History.</p>' : ''}
+    <div class="row"><button class="btn grow" data-close>Cancel</button><button class="btn ${ot.length ? 'warn' : 'primary'} grow" id="pvGo">${ot.length ? 'Proceed anyway' : 'Proceed'}</button></div>`, panel => {
+    $('#pvGo', panel).addEventListener('click', async () => {
+      const tx = extraTx || Tx();
+      moves.forEach(m => tx.update('appointments', m.id, moveFields(appt(m.id), m.after)));
+      closeSheet();
+      await commit(label, tx);
+      if (after) after();
+    });
+  });
+}
+/* Apply moves now, or preview first when any move goes past closing time. */
+function applyWithMoves(tx, moves, label, after) {
+  if (moves.some(m => m.overtime)) return previewSheet(label, moves, tx, label, after);
+  moves.forEach(m => tx.update('appointments', m.id, moveFields(appt(m.id), m.after)));
+  closeSheet();
+  commit(label + (moves.length ? ' · ' + moves.length + ' moved' : ''), tx).then(() => { if (after) after(); });
+}
+
+function delaySheet() {
+  const T = today();
+  const withAppts = DB.doctors.filter(d => DB.appts.some(a => a.date === T && a.doctor_id === d.id && S.MOVABLE.includes(a.status)));
+  if (!withAppts.length) { toast('No doctor has waiting patients today.'); return; }
+  const def = (withAppts.find(d => d.specialist) || withAppts[0]).id;
+  openSheet(sheetHead('Doctor running late') + `<form id="dl" style="display:grid;gap:12px">
+    <label class="field"><span class="label">Doctor</span><select id="dDoc">${withAppts.map(d => `<option value="${d.id}" ${d.id === def ? 'selected' : ''}>${esc(d.name)}${d.specialist ? ' — ' + esc(d.specialty) : ''}</option>`).join('')}</select></label>
+    <label class="field"><span class="label">Late by (minutes)</span><input id="dMin" type="number" inputmode="numeric" min="5" step="5" value="30"></label>
+    ${quick('dQ', [15, 30, 45, 60, 90], 30)}
+    <p class="hint" style="margin:0">The site moves this doctor's waiting patients. It also pushes later patients in the same chair, without double booking any doctor.</p>
+    <button class="btn primary">Show the new times</button></form>`, panel => {
+    bindQuick(panel, 'dQ', 'dMin');
+    $('#dl', panel).addEventListener('submit', e => {
+      e.preventDefault();
+      const docId = $('#dDoc', panel).value, mins = +$('#dMin', panel).value;
+      if (!(mins > 0)) return;
+      const moves = S.shiftDoctor(DB.appts, T, docId, mins, nowMin());
+      previewSheet(esc(doctor(docId).name) + ' late by ' + mins + ' min', moves, null, doctor(docId).name + ' late by ' + mins + ' min · ' + moves.length + ' moved', () => { UI.tab = 'queue'; UI.autoScroll = true; render(); });
+    });
+  });
+}
+
+function moveDaySheet() {
+  const d = UI.date;
+  const docs = DB.doctors.filter(x => DB.appts.some(a => a.date === d && a.doctor_id === x.id && S.MOVABLE.includes(a.status)));
+  if (!docs.length) { toast('No doctor has open appointments on ' + fmtDate(d) + '.'); return; }
+  const def = (docs.find(x => x.specialist) || docs[0]).id;
+  openSheet(sheetHead("Move a doctor's day") + `<div style="display:grid;gap:12px">
+    <p class="hint" style="margin:0">Moves all open appointments of one doctor from ${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'short' })}. A reservation moves with them.</p>
+    <label class="field"><span class="label">Doctor</span><select id="mDoc">${docs.map(x => `<option value="${x.id}" ${x.id === def ? 'selected' : ''}>${esc(x.name)}${x.specialist ? ' — ' + esc(x.specialty) : ''}</option>`).join('')}</select></label>
+    <div><div class="label" style="margin-bottom:6px">Best days in the next 2 weeks</div><div id="mDays" class="days"></div></div>
+    <label class="field"><span class="label">Or pick a date</span><input id="mDate" type="date" min="${today()}"></label></div>`, panel => {
+    const go = to => {
+      const docId = $('#mDoc', panel).value;
+      if (!to || to === d) return;
+      const moves = S.moveDoctorDay(DB.appts, d, docId, to, DB.blocks);
+      const tx = Tx();
+      DB.blocks.filter(b => b.doctor_id === docId && b.date === d).forEach(b => tx.update('blocks', b.id, { date: to }));
+      previewSheet('Move ' + esc(doctor(docId).name) + ' to ' + fmtDate(to), moves, tx, 'Moved ' + doctor(docId).name + ' · ' + fmtDate(d) + ' → ' + fmtDate(to) + ' · ' + moves.length + ' patients', () => { UI.date = to; UI.autoScroll = true; render(); });
+    };
+    const draw = () => {
+      const docId = $('#mDoc', panel).value;
+      const days = S.findDays(DB.appts, d, docId, 14, DB.blocks).filter(x => new Date(x.date + 'T00:00:00').getDay() !== 0);
+      days.sort((x, y) => x.late - y.late || x.shifted - y.shifted || x.load.booked - y.load.booked);
+      $('#mDays', panel).innerHTML = days.slice(0, 5).map(x => `<button type="button" class="dayopt" data-d="${x.date}"><b>${fmtDate(x.date, { weekday: 'short', day: 'numeric', month: 'short' })}</b>
+        <span>${x.late ? `<span class="chip bad">${x.late} after 9 PM</span>` : x.shifted ? `<span class="chip warn">${x.total - x.shifted} same time, ${x.shifted} shifted</span>` : `<span class="chip ok">All ${x.total} keep their time</span>`}</span>
+        <small>${x.load.free} free slots that day</small></button>`).join('');
+    };
+    $('#mDoc', panel).addEventListener('change', draw);
+    $('#mDays', panel).addEventListener('click', e => { const b = e.target.closest('.dayopt'); if (b) go(b.dataset.d); });
+    $('#mDate', panel).addEventListener('change', e => go(e.target.value));
+    draw();
+  });
+}
+
+function startSheet(id) {
+  const a = appt(id), p = patient(a.patient_id);
+  const est0 = a.duration_min;
+  openSheet(sheetHead('Start · ' + esc(p.name)) + `<form id="st" style="display:grid;gap:12px">
+    <div class="field"><span class="label">How long will this treatment take?</span>
+      <input type="hidden" id="sEst" value="${est0}">${quick('sQ', [15, 30, 45, 60, 90, 120], est0)}</div>
+    <div id="sEff" class="card soft"></div>
+    <button class="btn primary">Start now</button></form>`, panel => {
+    bindQuick(panel, 'sQ', 'sEst');
+    const eff = () => {
+      const est = +$('#sEst', panel).value, n = Math.round(nowMin());
+      const moves = S.afterStart(DB.appts, a, n, est);
+      $('#sEff', panel).innerHTML = `<div class="label">Ends about ${hm(n + est)}</div><div class="hint">${moves.length ? moves.length + ' later patient' + (moves.length > 1 ? 's move' : ' moves') + ': ' + moves.map(m => esc(patient(appt(m.id).patient_id).name.split(' ')[0]) + ' → ' + hm(m.after.start_min)).join(', ') : 'No other patient moves.'}</div>`;
+      return { est, n, moves };
+    };
+    $('#sEst', panel).addEventListener('change', eff);
+    eff();
+    $('#st', panel).addEventListener('submit', e => {
+      e.preventDefault();
+      const { est, n, moves } = eff();
+      const tx = Tx();
+      tx.update('appointments', id, { status: 'in_treatment', started_min: n, start_min: n, duration_min: est, sched_min: a.sched_min ?? a.start_min, booked_min: a.booked_min ?? a.duration_min, arrived_min: a.arrived_min ?? n });
+      applyWithMoves(tx, moves, 'Started ' + p.name + ' · ' + est + ' min');
+    });
+  });
+}
+
+function reserveSheet(ch) {
+  const d = UI.date;
+  const specs = DB.doctors.filter(x => x.active !== false).sort((x, y) => (y.specialist ? 1 : 0) - (x.specialist ? 1 : 0));
+  const list = blocksOn(d, ch);
+  openSheet(sheetHead(`Reserve Chair ${ch} · ${fmtDate(d)}`) + `
+    <p class="hint" style="margin:0">A reservation keeps the chair for one doctor. Other doctors get a warning when they book inside it, and walk-ins skip it.</p>
+    ${list.length ? `<div>${list.map(b => `<div class="hrow"><div><div class="lbl">${esc(doctor(b.doctor_id).name)}</div><div class="hint">${hm(b.start_min)} – ${hm(b.end_min)}</div></div><button class="btn sm danger" data-act="unreserve" data-id="${b.id}">Remove</button></div>`).join('')}</div>` : ''}
+    <form id="rs" class="card soft" style="display:grid;gap:10px"><label class="field"><span class="label">Doctor</span><select id="rDoc">${specs.map(x => `<option value="${x.id}">${esc(x.name)}${x.specialist ? ' — ' + esc(x.specialty) : ''}</option>`).join('')}</select></label>
+      <div class="two"><label class="field"><span class="label">From</span><select id="rFrom">${minOptions(11 * 60, S.OPEN, S.CLOSE - 30)}</select></label>
+      <label class="field"><span class="label">To</span><select id="rTo">${minOptions(14 * 60, S.OPEN + 30, S.CLOSE)}</select></label></div>
+      <div id="rMsg"></div><button class="btn primary">Reserve</button></form>`, panel => {
+    $('#rs', panel).addEventListener('submit', e => {
+      e.preventDefault();
+      const b = { id: uid(), date: d, chair: ch, doctor_id: $('#rDoc', panel).value, start_min: +$('#rFrom', panel).value, end_min: +$('#rTo', panel).value };
+      if (b.end_min <= b.start_min) { $('#rMsg', panel).innerHTML = '<div class="err">The end time must be after the start time.</div>'; return; }
+      if (list.some(x => x.start_min < b.end_min && b.start_min < x.end_min)) { $('#rMsg', panel).innerHTML = '<div class="err">This overlaps another reservation on this chair.</div>'; return; }
+      const inside = dayAppts(d, ch).filter(a => S.isActive(a) && a.doctor_id !== b.doctor_id && a.start_min < b.end_min && b.start_min < S.end(a));
+      const tx = Tx(); tx.insert('blocks', b); closeSheet();
+      commit(`Reserved Chair ${ch} for ${doctor(b.doctor_id).name} · ${hm(b.start_min)}–${hm(b.end_min)}`, tx, { quiet: !!inside.length });
+      if (inside.length) toast(inside.length + ' other booking' + (inside.length > 1 ? 's stay' : ' stays') + ' inside this time. Move them if needed.');
+    });
+  });
+}
+
+function monthSheet(base) {
+  const T = today(), m0 = (base || UI.date).slice(0, 7) + '-01';
+  const first = new Date(m0 + 'T00:00:00'), lead = (first.getDay() + 6) % 7;
+  const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < lead; i++) cells += '<span></span>';
+  for (let k = 1; k <= daysIn; k++) {
+    const d = m0.slice(0, 8) + pad(k), load = S.dayLoad(DB.appts, d), r = load.booked / load.total;
+    const spec = chairDoctors(d, 0).some(x => x.specialist);
+    cells += `<button class="mday ${d === UI.date ? 'sel' : ''} ${d === T ? 'today' : ''}" data-act="pickday" data-d="${d}" style="--load:${Math.round(r * 100)}%" aria-label="${fmtDate(d, { day: 'numeric', month: 'long' })}, ${load.booked} booked">
+      <b>${k}</b>${spec ? '<i class="sp"></i>' : ''}<span class="lb"></span></button>`;
+  }
+  const prev = addDays(m0, -1).slice(0, 7) + '-01', next = addDays(m0, 32).slice(0, 7) + '-01';
+  openSheet(sheetHead(fmtDate(m0, { month: 'long', year: 'numeric' })) + `
+    <div class="row"><button class="iconbtn" data-act="monthnav" data-d="${prev}" aria-label="Previous month">‹</button><button class="iconbtn" data-act="monthnav" data-d="${next}" aria-label="Next month">›</button>
+      <span class="legend" style="margin-left:auto"><span><i style="background:var(--accent)"></i>Booked</span><span><i style="background:var(--spec);border-radius:50%"></i>Specialist</span></span></div>
+    <div class="mgrid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<small>${x}</small>`).join('')}${cells}</div>`);
+}
+
+function listSheet(kind) {
+  if (kind === 'notes') {
+    const list = notesPending();
+    openSheet(sheetHead('Visit notes pending') + (list.length ? list.map(a => `<button class="visit vbtn" data-act="note" data-id="${a.id}"><b>${esc(patient(a.patient_id).name)} · ${fmtDate(a.date)}</b><span class="muted">${esc(doctor(a.doctor_id).name)}${a.reason ? ' · ' + esc(a.reason) : ''} · tap to add the note</span></button>`).join('') : '<p class="hint">All notes are done.</p>'));
+  } else {
+    const list = overdueFollowups();
+    openSheet(sheetHead('Overdue follow-ups') + `<div class="remind" style="background:transparent;padding:0">${list.length ? list.map(a => fuRow(a, true)).join('') : '<p class="hint">No overdue follow-ups.</p>'}</div>`);
+  }
+}
+
+function doctorSheet(id) {
+  const d = id ? doctor(id) : { name: '', specialist: false, specialty: '', active: true };
+  openSheet(sheetHead(id ? 'Edit doctor' : 'Add doctor') + `<form id="dc" style="display:grid;gap:12px">
+    <label class="field"><span class="label">Name</span><input id="cName" value="${esc(d.name)}" placeholder="Dr. Name" required></label>
+    <label class="field"><span class="label">Specialty</span><input id="cSpec" value="${esc(d.specialty)}" placeholder="For example: Endodontist"></label>
+    <label class="row"><input id="cIsSpec" type="checkbox" ${d.specialist ? 'checked' : ''}> Visiting specialist (shows in purple)</label>
+    <label class="row"><input id="cActive" type="checkbox" ${d.active !== false ? 'checked' : ''}> Active (shows in booking)</label>
+    <button class="btn primary">Save</button></form>`, panel => {
+    $('#dc', panel).addEventListener('submit', e => {
+      e.preventDefault();
+      const row = { name: $('#cName', panel).value.trim(), specialty: $('#cSpec', panel).value.trim(), specialist: $('#cIsSpec', panel).checked, active: $('#cActive', panel).checked };
+      if (!row.name) return;
+      const tx = Tx(); if (id) tx.update('doctors', id, row); else tx.insert('doctors', Object.assign({ id: uid() }, row));
+      closeSheet(); commit((id ? 'Edited ' : 'Added ') + row.name, tx);
+    });
+  });
+}
+
+/* ===== Actions ===== */
+function markArrived(id) { const a = appt(id), tx = Tx(); tx.update('appointments', id, { status: 'arrived', arrived_min: Math.round(nowMin()) }); closeSheet(); commit(patient(a.patient_id).name + ' arrived', tx); }
+function markNoShow(id) { const a = appt(id), tx = Tx(); tx.update('appointments', id, { status: 'no_show' }); closeSheet(); commit(patient(a.patient_id).name + ' marked no-show', tx); }
+function markLateArrival(id) {
+  const a = appt(id), n = nowMin(), tx = Tx();
+  const asArrived = Object.assign({}, a, { status: 'arrived' });
+  let start = a.start_min;
+  if (start + a.duration_min <= n || !S.isFree(DB.appts, [], asArrived, true)) {
+    start = S.firstGap(DB.appts, a.date, a.chair, a.duration_min, n, [id], a.doctor_id, DB.blocks);
+    if (start === null) start = S.endOfQueue(DB.appts, a.date, a.chair, n, [id], a.doctor_id);
+  }
+  tx.update('appointments', id, { status: 'arrived', late: true, arrived_min: Math.round(n), start_min: start, sched_min: a.sched_min ?? a.start_min });
+  closeSheet();
+  commit(patient(a.patient_id).name + ' arrived late · now ' + hm(start) + (start + a.duration_min > S.CLOSE ? ' (after 9 PM)' : ''), tx);
+}
+function markEnd(id) {
+  const a = appt(id), n = Math.round(nowMin()), st = a.started_min ?? a.start_min;
+  const moves = S.afterTreatmentEnd(DB.appts, a, n);
+  const tx = Tx(); tx.update('appointments', id, { status: 'done', ended_min: n, start_min: st, duration_min: Math.max(5, n - st) });
+  applyWithMoves(tx, moves, 'Finished ' + patient(a.patient_id).name, () => noteSheet(id));
+}
+function extend(id) {
+  const a = appt(id), moves = S.afterExtend(DB.appts, a, 15);
+  const tx = Tx(); tx.update('appointments', id, { duration_min: a.duration_min + 15 });
+  applyWithMoves(tx, moves, patient(a.patient_id).name + ' needs 15 more min');
+}
+function inform(id, kind, delay) {
+  const a = appt(id), tx = Tx();
+  tx.update('appointments', id, kind === 'moved' ? { informed: true } : { informed_delay: +delay });
+  commit('Told ' + patient(a.patient_id).name + ' about the new time', tx);
+}
+function dismissFollowup(id) {
+  const a = appt(id), tx = Tx(); tx.update('appointments', id, { followup_dismissed: true });
+  commit('Dismissed follow-up for ' + patient(a.patient_id).name, tx);
+  if (!$('#sheet').hidden) listSheet('overdue');
+}
+function copyText(v, btn) {
+  const done = () => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); };
+  try { navigator.clipboard.writeText(v).then(done, () => toast(v)); } catch (e) { toast(v); }
+}
+async function staffAction(kind, userId, role) {
+  if (LIVE) {
+    let r;
+    if (kind === 'approve') { const q = DB.requests.find(x => x.user_id === userId); r = await sb.from('staff').insert({ user_id: userId, name: q.name || q.email, role }); if (!r.error) r = await sb.from('staff_requests').delete().eq('user_id', userId); }
+    if (kind === 'decline') r = await sb.from('staff_requests').delete().eq('user_id', userId);
+    if (kind === 'role') r = await sb.from('staff').update({ role }).eq('user_id', userId);
+    if (kind === 'remove') r = await sb.from('staff').delete().eq('user_id', userId);
+    if (r && r.error) { toast('Could not change staff: ' + r.error.message, null, true); return; }
+    await loadLive();
+  } else {
+    if (kind === 'approve') { const q = DB.requests.find(x => x.user_id === userId); DB.staff.push({ user_id: userId, name: q.name, role }); DB.requests = DB.requests.filter(x => x.user_id !== userId); }
+    if (kind === 'decline') DB.requests = DB.requests.filter(x => x.user_id !== userId);
+    if (kind === 'role') DB.staff.find(x => x.user_id === userId).role = role;
+    if (kind === 'remove') DB.staff = DB.staff.filter(x => x.user_id !== userId);
+    saveDemo(); render();
+  }
+  toast({ approve: 'Staff approved', decline: 'Request declined', role: 'Role changed', remove: 'Staff removed' }[kind]);
+}
+
+/* ===== Events ===== */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const id = el.dataset.id;
+  switch (el.dataset.act) {
+    case 'tab': closeSheet(); UI.tab = el.dataset.t; UI.autoScroll = true; render(); break;
+    case 'date': UI.date = el.dataset.d; UI.autoScroll = UI.tab === 'day'; if (UI.tab !== 'day' && UI.tab !== 'queue') UI.tab = 'day'; render(); break;
+    case 'shift': UI.date = addDays(UI.date, +el.dataset.n); render(); break;
+    case 'month': monthSheet(); break;
+    case 'monthnav': monthSheet(el.dataset.d); break;
+    case 'pickday': closeSheet(); UI.date = el.dataset.d; UI.tab = 'day'; UI.autoScroll = true; render(); break;
+    case 'chairs': UI.chairs = +el.dataset.v; render(); break;
+    case 'fab': fabSheet(); break;
+    case 'book': bookSheet(el.dataset.ch ? { chair: +el.dataset.ch, start: +el.dataset.s } : {}); break;
+    case 'walkin': walkInSheet(); break;
+    case 'reserve': reserveSheet(+el.dataset.ch); break;
+    case 'unreserve': if (el.dataset.sure) { const b = DB.blocks.find(x => x.id === id), tx = Tx(); tx.remove('blocks', id); closeSheet(); commit('Removed reservation for ' + doctor(b.doctor_id).name, tx); }
+      else { el.dataset.sure = '1'; el.textContent = 'Tap again'; } break;
+    case 'open': apptSheet(id); break;
+    case 'patient': patientSheet(id); break;
+    case 'bookpt': bookSheet({ patient: patient(id), date: UI.date }); break;
+    case 'edit': bookSheet({ id }); break;
+    case 'bookfor': { const a = appt(id); bookSheet({ patient: patient(a.patient_id), doctor_id: a.doctor_id, date: a.next_followup && a.next_followup >= today() ? a.next_followup : UI.date, reason: a.next_followup ? 'Follow-up' : '' }); break; }
+    case 'bookfu': { const a = appt(id); bookSheet({ patient: patient(a.patient_id), doctor_id: a.note_doctor_id || a.doctor_id, date: a.next_followup >= today() ? a.next_followup : today(), reason: 'Follow-up' }); break; }
+    case 'dismissfu': dismissFollowup(id); break;
+    case 'list': listSheet(el.dataset.l); break;
+    case 'arrive': markArrived(id); break;
+    case 'noshow': markNoShow(id); break;
+    case 'start': startSheet(id); break;
+    case 'extend': extend(id); break;
+    case 'end': markEnd(id); break;
+    case 'latearrive': markLateArrival(id); break;
+    case 'note': noteSheet(id); break;
+    case 'inform': inform(id, el.dataset.k, el.dataset.d); break;
+    case 'copy': copyText(el.dataset.v, el); break;
+    case 'delay': delaySheet(); break;
+    case 'moveday': moveDaySheet(); break;
+    case 'undo': $('#toast').hidden = true; undo(id); break;
+    case 'histall': UI.histAll = !UI.histAll; render(); break;
+    case 'doc': doctorSheet(id); break;
+    case 'insrange': UI.ins.range = +el.dataset.v; render(); break;
+    case 'approve': staffAction('approve', id, $('#rq-' + CSS.escape(id)).value); break;
+    case 'decline': staffAction('decline', id); break;
+    case 'unstaff': if (el.dataset.sure) staffAction('remove', id); else { el.dataset.sure = '1'; el.textContent = 'Tap again'; } break;
+    case 'role': setRole(el.dataset.v); store(STORE_KEY + '-role', el.dataset.v); render(); break;
+    case 'reset': if (el.dataset.sure) { loadDemo(true); UI.date = today(); render(); toast('Demo data reset.'); } else { el.dataset.sure = '1'; el.textContent = 'Tap again to reset'; } break;
+    case 'signout': sb.auth.signOut().then(() => { outbox = []; store(OUTBOX_KEY, []); renderLogin(); }); break;
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'demoTime' && t.value) { const [h, m] = t.value.split(':').map(Number); demoClock = { min: h * 60 + m, realAt: Date.now(), real: false }; saveDemo(); render(); }
+  if (t.id === 'demoReal') { demoClock.real = t.checked; if (!demoClock.real) { demoClock.min = 11 * 60 + 20; demoClock.realAt = Date.now(); } saveDemo(); render(); }
+  if (t.id === 'insDoc') { UI.ins.doc = t.value; render(); }
+  if (t.id === 'insChair') { UI.ins.chair = +t.value; render(); }
+  if (t.id === 'insTreat') { UI.ins.treat = t.value; render(); }
+  if (t.classList.contains('minisel') && t.dataset.uid) staffAction('role', t.dataset.uid, t.value);
+});
+document.addEventListener('input', e => { if (e.target.id === 'pSearch') { UI.pq = e.target.value; $('#pList').innerHTML = patientRows(UI.pq); } });
+/* Chart tooltip: hover on desktop, tap on phones */
+const tip = $('#tip');
+function showTip(e) {
+  const el = e.target.closest && e.target.closest('[data-tip]');
+  if (!el) { tip.hidden = true; return; }
+  tip.textContent = el.dataset.tip; tip.hidden = false;
+  const x = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, e.clientX - tip.offsetWidth / 2));
+  tip.style.left = x + 'px'; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 14) + 'px';
+}
+document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showTip(e); });
+document.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') showTip(e); });
+document.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
+setInterval(() => {
+  const busy = !$('#sheet').hidden || (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName));
+  if (!busy && document.visibilityState === 'visible' && $('.top')) render();
+}, 30000);
+
+/* ===== Start ===== */
+if (document.querySelector('link[rel=manifest]') && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (LIVE) initLive().catch(e => { $('#app').innerHTML = '<div class="wrap"><div class="login card"><h1>chairbook</h1><p class="err">Could not connect to the database. Check the internet and the settings in the file.</p></div></div>'; console.error(e); });
+else { UI.online = true; loadDemo(); render(); }
+
+})();
+</script>
+
+</body></html>
