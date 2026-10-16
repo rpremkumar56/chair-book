@@ -337,8 +337,8 @@ main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); displa
 <div id="tip" class="tip" hidden></div>
 
 <script>
-/* Build id. build.py writes it here and in version.json. '2026.10.16-0657-5534f9b' (not built) = dev. */
-const APP_VERSION = '2026.10.16-0657-5534f9b';
+/* Build id. build.py writes it here and in version.json. '2026.10.16-0753-352190c' (not built) = dev. */
+const APP_VERSION = '2026.10.16-0753-352190c';
 /* ===== Settings you edit before going live =====
    Paste your Supabase project URL and anon key here. Leave empty to run the demo. */
 const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0bHhhbXN1cGxybnN6ZGhpaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwOTc4NTAsImV4cCI6MjEwNzY3Mzg1MH0.W8kb9cw8xqWIrLCM2ZH7yVJvzDi_si0DE_DFhpWn7Zg" };
@@ -1051,22 +1051,27 @@ function storedUser() {
     return u && u.id ? u : null;
   } catch (e) { return null; }
 }
-/* Snapshot: the last data this phone loaded, so the site opens without internet. */
+/* Snapshot: a small copy of today's and tomorrow's schedule, so the site opens without internet.
+   Staff use personal phones, so it keeps no visit notes, plans or history, and it expires after 24 hours. */
 let snapTimer;
+const SNAP_MAX_AGE = 24 * 3600e3;
+const SNAP_DROP = ['treatment_done', 'plan', 'next_followup']; // left out, not blanked: a later save keeps the server's values
 function saveSnapshot() {
   if (!LIVE || !UI.userId || !liveReady) return;
-  const key = SNAP_KEY + UI.userId, from = addDays(today(), -14);
-  const full = () => ({ doctors: DB.doctors, patients: DB.patients, appts: DB.appts, blocks: DB.blocks, log: DB.log.slice(0, LOG_LIMIT), staff: DB.staff, requests: DB.requests, config: DB.config });
-  const small = () => Object.assign(full(), { appts: DB.appts.filter(a => a.date >= from), log: DB.log.slice(0, 10) });
-  for (const make of [full, small]) {
-    try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), role: UI.role, user: UI.user, userId: UI.userId, db: make() })); return; } catch (e) { /* too big: try smaller */ }
-  }
-  try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+  const key = SNAP_KEY + UI.userId, T = today(), T1 = addDays(T, 1);
+  const appts = DB.appts.filter(a => a.date >= T && a.date <= T1 && a.status !== 'cancelled')
+    .map(a => { const r = Object.assign({}, a); SNAP_DROP.forEach(k => delete r[k]); return r; });
+  const ids = new Set(appts.map(a => a.patient_id));
+  const db = { doctors: DB.doctors, patients: DB.patients.filter(x => ids.has(x.id)), appts,
+    blocks: DB.blocks.filter(b => b.date >= T && b.date <= T1), config: DB.config };
+  try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), role: UI.role, user: UI.user, userId: UI.userId, db })); }
+  catch (e) { try { localStorage.removeItem(key); } catch (e2) { /* ignore */ } }
 }
 function saveSnapshotSoon() { clearTimeout(snapTimer); snapTimer = setTimeout(saveSnapshot, 3000); }
 function useSnapshot(userId) {
   const s = store(SNAP_KEY + userId);
   if (!s || !s.db) return false;
+  if (!(Date.now() - (s.at || 0) < SNAP_MAX_AGE)) { clearSnapshots(); return false; } // older than 24 hours: delete it
   ['doctors', 'patients', 'appts', 'blocks', 'log', 'staff', 'requests'].forEach(k => { DB[k] = Array.isArray(s.db[k]) ? s.db[k] : []; });
   DB.config = normConfig(s.db.config);
   UI.role = s.role || 'receptionist'; UI.user = s.user || ROLE_NAME[UI.role] || 'Staff'; UI.userId = s.userId || userId;
