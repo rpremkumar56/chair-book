@@ -1,6 +1,6 @@
 /* BookAssist service worker: the site opens without internet. Data calls always go to the network.
-   build.py replaces 2026.10.16-0753-352190c, so every deploy gets a new cache and the old cache is deleted. */
-const CACHE = 'bookassist-2026.10.16-0753-352190c';
+   build.py replaces 2026.10.18-0556-83c57b1, so every deploy gets a new cache and the old cache is deleted. */
+const CACHE = 'bookassist-2026.10.18-0556-83c57b1';
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './supabase.min.js'];
 self.addEventListener('install', e => {
   // cache: 'reload' skips the browser HTTP cache, so the new cache gets the new files.

@@ -337,8 +337,8 @@ main { padding-block: 6px calc(110px + env(safe-area-inset-bottom, 0px)); displa
 <div id="tip" class="tip" hidden></div>
 
 <script>
-/* Build id. build.py writes it here and in version.json. '2026.10.16-0753-352190c' (not built) = dev. */
-const APP_VERSION = '2026.10.16-0753-352190c';
+/* Build id. build.py writes it here and in version.json. '2026.10.18-0556-83c57b1' (not built) = dev. */
+const APP_VERSION = '2026.10.18-0556-83c57b1';
 /* ===== Settings you edit before going live =====
    Paste your Supabase project URL and anon key here. Leave empty to run the demo. */
 const CONFIG = { supabaseUrl: "https://qtlxamsuplrnszdhiheq.supabase.co", supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0bHhhbXN1cGxybnN6ZGhpaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwOTc4NTAsImV4cCI6MjEwNzY3Mzg1MH0.W8kb9cw8xqWIrLCM2ZH7yVJvzDi_si0DE_DFhpWn7Zg" };
@@ -1039,7 +1039,7 @@ async function loadLib() {
 }
 let channel = null, loadSeq = 0, loaded = null, loadingSince = 0, eventsWhileLoading = [];
 let usingSnapshot = false, staleData = false, starting = null, startRetry = null, hiddenAt = 0;
-let recovering = typeof location !== 'undefined' && /type=recovery/.test(location.hash || '');
+let recovering = typeof location !== 'undefined' && /type=(recovery|invite)/.test(location.hash || '');
 const extraMonths = new Set();
 
 /** The signed-in user from the saved session. Works offline, before the library loads. */
@@ -1167,7 +1167,7 @@ async function afterLogin(user) {
     if (!usingSnapshot && useSnapshot(user.id)) render();
     return startFailed(res.error);
   }
-  if (!res.data) return signOut('Your account waits for the admin to approve it. Ask the admin to open More > Staff.');
+  if (!res.data) return signOut('This account is not on the staff list. Ask the admin to send you an invite.');
   const staff = res.data;
   if (UI.userId && UI.userId !== staff.user_id) ['appts', 'log', 'staff', 'requests'].forEach(k => { DB[k] = []; });
   UI.role = staff.role; UI.user = staff.name; UI.userId = staff.user_id;
@@ -1347,21 +1347,18 @@ async function signOut(msg) {
   renderLogin(msg);
 }
 
-/* Sign in, ask for access, forgot password. mode: false = sign in, true = ask for access, 'forgot'. */
+/* Sign in or forgot password. mode: false = sign in, 'forgot'. New staff come by email invite from the admin. */
 function renderLogin(msg, mode) {
-  const signup = mode === true, forgot = mode === 'forgot';
-  const intro = signup ? 'Ask for a staff account. The admin approves it.' : forgot ? 'Enter your email. We send you a link to set a new password.' : 'Sign in with your clinic staff account.';
+  const forgot = mode === 'forgot';
+  const intro = forgot ? 'Enter your email. We send you a link to set a new password.' : 'Sign in with your clinic staff account.';
   $('#app').innerHTML = `<div class="wrap"><form class="login card" id="loginForm">
     <h1>bookassist</h1><p class="muted">${intro}</p>
-    ${signup ? '<label class="field"><span class="label">Your name</span><input id="lgName" required></label>' : ''}
     <label class="field"><span class="label">Email</span><input id="lgEmail" type="email" autocomplete="username" required></label>
-    ${forgot ? '' : `<label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="${signup ? 8 : 6}" required></label>`}
-    ${signup ? '<p class="hint" style="margin:0">Use at least 8 characters.</p>' : ''}
-    ${msg ? `<div class="${/approve|sent|changed/i.test(msg) && !/did not|could not/i.test(msg) ? 'hint' : 'err'}">${esc(msg)}</div>` : ''}
-    <button class="btn primary">${signup ? 'Ask for access' : forgot ? 'Send the link' : 'Sign in'}</button>
-    ${!signup && !forgot ? '<button type="button" class="linkbtn" id="lgForgot">Forgot password?</button>' : ''}
-    <button type="button" class="btn" id="lgSwitch">${signup || forgot ? 'Back to sign in' : 'New staff? Ask for access'}</button></form></div>`;
-  $('#lgSwitch').addEventListener('click', () => renderLogin('', signup || forgot ? false : true));
+    ${forgot ? '' : `<label class="field"><span class="label">Password</span><input id="lgPass" type="password" autocomplete="current-password" minlength="6" required></label>`}
+    ${msg ? `<div class="${/sent|changed/i.test(msg) && !/did not|could not/i.test(msg) ? 'hint' : 'err'}">${esc(msg)}</div>` : ''}
+    <button class="btn primary">${forgot ? 'Send the link' : 'Sign in'}</button>
+    ${forgot ? '<button type="button" class="btn" id="lgSwitch">Back to sign in</button>' : '<button type="button" class="linkbtn" id="lgForgot">Forgot password?</button>'}</form></div>`;
+  const sw = $('#lgSwitch'); if (sw) sw.addEventListener('click', () => renderLogin(''));
   const fg = $('#lgForgot'); if (fg) fg.addEventListener('click', () => renderLogin('', 'forgot'));
   $('#loginForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1372,13 +1369,6 @@ function renderLogin(msg, mode) {
         const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
         if (error) return renderLogin('Could not send the link. ' + error.message, 'forgot');
         return renderLogin('Link sent. Check your email. Open the link on this phone.');
-      }
-      if (signup) {
-        if (password.length < 8) return renderLogin('Use at least 8 characters for the password.', true);
-        const { error } = await sb.auth.signUp({ email, password, options: { data: { name: $('#lgName').value.trim() } } });
-        if (error) return renderLogin(error.message, true);
-        await sb.auth.signOut();
-        return renderLogin('Request sent. You can sign in after the admin approves it.');
       }
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) return renderLogin(/fetch|network/i.test(error.message || '') ? 'Could not connect. Check the internet.' : 'Sign-in failed. Check the email and password.');
@@ -1838,7 +1828,12 @@ function moreHTML() {
       ${DB.staff.map(s => `<div class="hrow"><div><div class="lbl">${esc(s.name)}</div></div><div class="row" style="gap:6px;flex-wrap:nowrap">
         <select class="minisel" data-uid="${esc(s.user_id)}" ${s.user_id === UI.userId ? 'disabled' : ''}>${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === s.role ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
         ${s.user_id === UI.userId ? '' : `<button class="btn sm danger" data-act="unstaff" data-id="${esc(s.user_id)}">Remove</button>`}</div></div>`).join('')}
-      <p class="hint" style="margin:6px 0 0">New staff tap "New staff? Ask for access" on the sign-in screen. Their request shows here.</p></section>`;
+      <div class="label" style="margin:12px 0 6px">Invite new staff</div>
+      <label class="field"><span class="label">Name</span><input id="invName" autocomplete="off"></label>
+      <label class="field"><span class="label">Email</span><input id="invEmail" type="email" autocomplete="off"></label>
+      <div class="row" style="gap:6px;flex-wrap:nowrap"><select class="minisel" id="invRole" aria-label="Role">${Object.keys(ROLE_NAME).map(k => `<option value="${k}" ${k === 'receptionist' ? 'selected' : ''}>${ROLE_NAME[k]}</option>`).join('')}</select>
+        <button class="btn sm primary" data-act="invite">Send invite</button></div>
+      <p class="hint" style="margin:6px 0 0">They get an email with a link to set a password. They are on the staff list at once.</p></section>`;
   }
   out += clinicDaysHTML();
   if (isAdmin() && DB.errorCount > 0) out += `<section class="card"><h2 class="section-h">App errors</h2><p style="margin:0">App errors in the last 7 days: <b>${+DB.errorCount}</b></p><p class="hint" style="margin:4px 0 0">Tell Prem.</p></section>`;
@@ -2499,6 +2494,26 @@ async function staffAction(kind, userId, role) {
   toast({ approve: 'Staff approved', decline: 'Request declined', role: 'Role changed', remove: 'Staff removed' }[kind]);
 }
 
+/* Admin invites a person by email. The server function sends the email and adds them to staff. */
+async function inviteStaff(btn) {
+  const name = $('#invName').value.trim(), email = $('#invEmail').value.trim(), role = $('#invRole').value;
+  if (!name || !email) { toast('Enter the name and the email.', null, true); return; }
+  if (!LIVE) { toast('Invites work on the live site only.', null, true); return; }
+  btn.disabled = true;
+  try {
+    const { error } = await sb.functions.invoke('invite-staff', { body: { name, email, role } });
+    if (error) {
+      let msg = 'Check the internet.';
+      try { msg = (await error.context.json()).error || msg; } catch (e) { /* no detail */ }
+      toast('Could not invite. ' + msg, null, true);
+      return;
+    }
+    await loadLive();
+    toast('Invite sent to ' + email);
+  } catch (e) { toast('Could not invite. Check the internet.', null, true); }
+  finally { btn.disabled = false; }
+}
+
 /* ===== Events ===== */
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -2542,6 +2557,7 @@ document.addEventListener('click', e => {
     case 'insrange': UI.ins.range = +el.dataset.v; render(); break;
     case 'approve': staffAction('approve', id, $('#rq-' + CSS.escape(id)).value); break;
     case 'decline': staffAction('decline', id); break;
+    case 'invite': inviteStaff(el); break;
     case 'unstaff': if (el.dataset.sure) staffAction('remove', id); else { el.dataset.sure = '1'; el.textContent = 'Tap again'; } break;
     case 'theme': store(THEME_KEY, el.dataset.v); applyTheme(el.dataset.v); render(); break;
     case 'role': setRole(el.dataset.v); store(STORE_KEY + '-role', el.dataset.v); render(); break;
